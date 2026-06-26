@@ -19,7 +19,7 @@ struct Chunk {
 }
 
 struct Message {
-    delta: Vec<u8>, // Erm acktually the MIDI format uses Variable Length Quantities to represent the delta.
+    delta: Vec<u32>, // Erm acktually the MIDI format uses Variable Length Quantities to represent the delta.
     status: u8,
     data: Vec<u8>
 }
@@ -93,7 +93,7 @@ fn main() -> std::io::Result<()> {
                     bytes[next_chunk_offset + 3],
                 ],
                 length: l,
-                data: bytes[(next_chunk_offset + 4)..(next_chunk_offset + 4 + l as usize)].to_vec(),
+                data: bytes[(next_chunk_offset + 8)..(next_chunk_offset + 8 + l as usize)].to_vec(),
             },
         );
         next_chunk_offset += 8 + l as usize;
@@ -103,7 +103,7 @@ fn main() -> std::io::Result<()> {
     let mut first_inv_chunk = 0;
 
     for (i, j) in tracks.iter().enumerate() {
-        if (j.flag != [0x4D, 0x54, 0x72, 0x6B]) || j.data.ends_with(&[0x00, 0xFF, 0x2F, 0x00]) {
+        if (j.flag != [0x4D, 0x54, 0x72, 0x6B]) || !j.data.ends_with(&[0x00, 0xFF, 0x2F, 0x00]) {
             valid_tracks = false;
             first_inv_chunk = i;
             break;
@@ -115,6 +115,54 @@ fn main() -> std::io::Result<()> {
             ErrorKind::InvalidInput,
             format!("Chunk {first_inv_chunk} has an invalid flag or no end command!")
         ))
+    }
+
+    for track in tracks {
+        let d = track.data;
+        let possible_bytes = [d[0], d[1], d[2], d[3]];
+        let mut bytes: Vec<u8> = vec![];
+        for byte in possible_bytes {
+            if (byte & 0x80) == 0x80 {
+                bytes.insert(bytes.len(), byte);
+                continue;
+            } else {
+                bytes.insert(bytes.len(), byte);
+                break;
+            }
+        }
+
+        let mut vlq: u32 = 0;
+
+        if bytes.len() == 4 {
+            vlq = u32::from_be_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]);
+        } else if bytes.len() == 3 {
+            vlq = u32::from_be_bytes([0, bytes[0], bytes[1], bytes[2]]);
+        } else if bytes.len() == 2 {
+            vlq = u32::from_be_bytes([0, 0, bytes[0], bytes[1]]);
+        } else if bytes.len() == 1 {
+            vlq = u32::from_be_bytes([0, 0, 0, bytes[0]]);
+        }
+
+        println!("{}", vlq);
+
+        let mut n = vlq & 0x7F;
+
+        // More-or-less copy-pasted from ImHex's MIDI 1.0 pattern.
+        if vlq & 0x8000 == 0x8000 {
+            n += ((vlq & 0x7f00) >> 8) * 0x80;
+        }
+        if vlq & 0x800000 == 0x800000 {
+            n += ((vlq & 0x7f0000) >> 8 * 2) * 0x80 * 0x80;
+        }
+        if vlq & 0x80000000 == 0x80000000 {
+            n += ((vlq & 0x7f000000) >> 8 * 3) * 0x80 * 0x80 * 0x80;
+        }
+
+        println!("Delta 0 is {}", n);
+
+        let status = d[bytes.len()];
+
+        println!("Status 0 is {} at offset {:X}", status, bytes.len());
     }
 
     Ok(())
