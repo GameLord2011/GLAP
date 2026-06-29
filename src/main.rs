@@ -18,6 +18,7 @@ struct Chunk {
     data: Vec<u8>,
 }
 
+#[derive(Clone)]
 struct Message {
     delta: u32, // Erm acktually the MIDI format uses Variable Length Quantities to represent the delta.
     status: u8,
@@ -26,10 +27,10 @@ struct Message {
 
 impl Message {
     /**
-     * Creates a new (empty) message and returns it.
+        Creates a new (empty) message and returns it.
      */
-    fn new() -> Message {
-        Message {
+    fn new() -> Self {
+        Self {
             delta: 0,
             status: 0,
             data: vec![]
@@ -190,10 +191,10 @@ fn main() -> std::io::Result<()> {
                 n += ((vlq & 0x7f00) >> 8) * 0x80;
             }
             if vlq & 0x800000 == 0x800000 {
-                n += ((vlq & 0x7f0000) >> 8 * 2) * 0x80 * 0x80;
+                n += ((vlq & 0x7f0000) >> 8 * 2) * 0x4000;
             }
             if vlq & 0x80000000 == 0x80000000 {
-                n += ((vlq & 0x7f000000) >> 8 * 3) * 0x80 * 0x80 * 0x80;
+                n += ((vlq & 0x7f000000) >> 8 * 3) * 0x200000;
             }
 
             println!("D = {}", n);
