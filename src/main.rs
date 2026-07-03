@@ -30,6 +30,7 @@ struct Track {
 #[derive(Clone)]
 struct Message {
     delta: u32, // Erm acktually the MIDI format uses Variable Length Quantities to represent the delta.
+    channel: Option<u8>,
     status: u8,
     data: Vec<u8>,
 }
@@ -41,6 +42,7 @@ impl Message {
     fn new() -> Self {
         Self {
             delta: 0,
+            channel: None,
             status: 0,
             data: vec![]
         }
