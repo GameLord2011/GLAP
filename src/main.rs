@@ -217,6 +217,9 @@ fn main() -> std::io::Result<()> {
                 0x90..=0x9F /* Note on */ => {
                     offset += bytes.len() + 3;
                 },
+                0xA0..=0xAF => {
+                    offset += bytes.len() + 3;
+                },
                 0xFA /* Start */ => {println!("Note start")},
                 0xFB /* Continue */ => {println!("Continue")},
                 0xFC /* End */ => {println!("Note end")},
