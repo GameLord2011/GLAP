@@ -219,30 +219,87 @@ fn main() -> std::io::Result<()> {
                 0x90..=0x9F /* Note on */ => {
                     offset += bytes.len() + 3;
                 },
-                0xA0..=0xAF => {
+                0xA0..=0xAF /* Polyphonic after touch (what) */ => {
                     offset += bytes.len() + 3;
                 },
-                0xFA /* Start */ => {println!("Note start")},
-                0xFB /* Continue */ => {println!("Continue")},
-                0xFC /* End */ => {println!("Note end")},
+                0xB0..=0xBF /* Control change */ => {
+                    offset += bytes.len() + 3;
+                },
+                0xC0..=0xCF /* Program change */ => {
+                    offset += bytes.len() + 2;
+                },
+                0xD0..=0xDF /* Channel After Touch (wat) */ => {
+                    offset += bytes.len() + 2;
+                },
+                0xE0..=0xEF /* Pitch Wheel */ => {
+                    offset += bytes.len() + 4;
+                },
+                0xF0 /* SysEx; this uses vlq's whyyyyyyyyy */ => {
+                    offset += bytes.len()
+                },
+                0xF1 /* Time Code Qtr Frame (??) */ => {
+                    offset += bytes.len();
+                },
+                0xF2 /* Song Position Pointer (Sounds important.) */ => {
+                    offset += bytes.len() + 3;
+                },
+                0xF3 /* Song Select */ => {
+                    offset += bytes.len()
+                },
+                0xF4..=0xF5 /* Undefined (why tho?) */ => {},
+                0xF6 /* Tune Request */ => {
+                    offset += bytes.len() + 2;
+                },
+                0xF7 /* EndOfSysEx (wait what now) */ => {
+                    offset += bytes.len();
+                },
+                0xF8 /* Timing Clock (makes sense) */ => {
+                    offset += bytes.len();
+                },
+                0xF9 /* Undefined */ => {
+                    offset += bytes.len();
+                },
+                0xFA /* Start */ => {
+                    offset += bytes.len();
+                },
+                0xFB /* Continue */ => {
+                    offset += bytes.len();
+                },
+                0xFC /* Stop */ => {
+                    offset += bytes.len();
+                },
                 0xFF /* Meta Event */ => {
-                    println!("Meta event.");
+                    println!("Meta event {:X}.", d[offset + bytes.len() + 1]);
                     match d[offset + bytes.len() + 1] {
-                        0x01..=0x06 /* String-related things */ => {
+                        0x00 /* Sequence number */ => {},
+                        0x01..=0x07 /* String-related things */ => {
                             println!("String event");
                             offset += d[offset + bytes.len() + 2] as usize + bytes.len() + 3;
-                        },  
+                        },
+                        0x20 /* Channel Prefix */ => {},
                         0x2F /* End of track */ => {
                             println!("Eot; {}, {:X}", status, d[offset + bytes.len() + 1]);
                             break;
                         },
+                        0x51 /* Set Tempo */ => {
+                            offset += 3 + d[offset + bytes.len() + 2] as usize;
+                        },
+                        0x54 /* SMTPE Offset */ => {},
+                        0x58 /* Time Signature */ => {
+                            offset += bytes.len() + 6;
+                        },
+                        0x59 /* Key Signature */ => {
+                            offset += bytes.len() + 4;
+                        },
+                        0x7F /* Sequencer Specific */ => {},
                         _ => {
                             println!("Unknown meta event; type is {:X}; length is {} bytes", d[offset + bytes.len() + 1], d[offset + bytes.len() + 2]);
-                            offset += d[offset + bytes.len() + 2] as usize + bytes.len() + 3;
+                            // offset += d[offset + bytes.len() + 2] as usize + bytes.len() + 3;
+                            break;
                         }
                     }
                 },
-                _ => {println!("Unknown status {:X}", status)}
+                _ => {println!("Unknown status {:X}", status); break;}
             }
         }
     }
