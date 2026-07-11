@@ -49,6 +49,34 @@ impl Message {
     }
 }
 
+#[derive(Clone, Copy)]
+struct Vlq {
+    value: u32,
+    length: usize
+}
+
+impl Vlq {
+    fn from_bytes(possible_bytes: &[u8]) -> Self {
+        let mut val = 0;
+        let mut len = 0;
+
+        for byte in possible_bytes {
+            let actual_byte = (byte & 0b01111111) as u32;
+            val = (val << 7) | actual_byte;
+            len += 1;
+
+            if byte & 0b10000000 == 0b00000000 {
+                break;
+            }
+        }
+
+        Self {
+            value: val,
+            length: len
+        }
+    }
+}
+
 #[cfg(not(target_os = "macos"))]
 #[used]
 #[unsafe(link_section = ".text")]
@@ -166,135 +194,94 @@ fn main() -> std::io::Result<()> {
         loop {
             // let mut message = Message::new();
             println!("{}", offset);
-            let possible_bytes = [d[offset], d[offset + 1], d[offset + 2], d[offset + 3]];
-            let mut bytes: Vec<u8> = vec![];
-            for byte in possible_bytes {
-                if (byte & 0x80) == 0x80 {
-                    bytes.insert(bytes.len(), byte);
-                    continue;
-                } else {
-                    bytes.insert(bytes.len(), byte);
-                    break;
-                }
-            }
+            let vlq = Vlq::from_bytes(&[d[offset], d[offset + 1], d[offset + 2], d[offset + 3]]);
 
-            let mut vlq: u32 = 0;
+            println!("D = {}", vlq.value);
 
-            if bytes.len() == 4 {
-                vlq = u32::from_be_bytes([
-                    bytes[0],
-                    bytes[1],
-                    bytes[2],
-                    bytes[3],
-                ]);
-            } else if bytes.len() == 3 {
-                vlq = u32::from_be_bytes([0, bytes[0], bytes[1], bytes[2]]);
-            } else if bytes.len() == 2 {
-                vlq = u32::from_be_bytes([0, 0, bytes[0], bytes[1]]);
-            } else if bytes.len() == 1 {
-                vlq = u32::from_be_bytes([0, 0, 0, bytes[0]]);
-            }
-
-            let mut n = vlq & 0x7F;
-
-            // More-or-less copy-pasted from ImHex's MIDI 1.0 pattern.
-            if vlq & 0x8000 == 0x8000 {
-                n += ((vlq & 0x7f00) >> 8) * 0x80;
-            }
-            if vlq & 0x800000 == 0x800000 {
-                n += ((vlq & 0x7f0000) >> 8 * 2) * 0x4000;
-            }
-            if vlq & 0x80000000 == 0x80000000 {
-                n += ((vlq & 0x7f000000) >> 8 * 3) * 0x200000;
-            }
-
-            println!("D = {}", n);
-
-            let status = d[offset + bytes.len()];
+            let status = d[offset + vlq.length];
 
             match status {
                 0x80..=0x8F /* Note off */ => {
-                    offset += bytes.len() + 3;
+                    offset += vlq.length + 3;
                 },
                 0x90..=0x9F /* Note on */ => {
-                    offset += bytes.len() + 3;
+                    offset += vlq.length + 3;
                 },
                 0xA0..=0xAF /* Polyphonic after touch (what) */ => {
-                    offset += bytes.len() + 3;
+                    offset += vlq.length + 3;
                 },
                 0xB0..=0xBF /* Control change */ => {
-                    offset += bytes.len() + 3;
+                    offset += vlq.length + 3;
                 },
                 0xC0..=0xCF /* Program change */ => {
-                    offset += bytes.len() + 2;
+                    offset += vlq.length + 2;
                 },
                 0xD0..=0xDF /* Channel After Touch (wat) */ => {
-                    offset += bytes.len() + 2;
+                    offset += vlq.length + 2;
                 },
                 0xE0..=0xEF /* Pitch Wheel */ => {
-                    offset += bytes.len() + 4;
+                    offset += vlq.length + 4;
                 },
                 0xF0 /* SysEx; this uses vlq's whyyyyyyyyy */ => {
-                    offset += bytes.len()
+                    offset += vlq.length
                 },
                 0xF1 /* Time Code Qtr Frame (??) */ => {
-                    offset += bytes.len();
+                    offset += vlq.length;
                 },
                 0xF2 /* Song Position Pointer (Sounds important.) */ => {
-                    offset += bytes.len() + 3;
+                    offset += vlq.length + 3;
                 },
                 0xF3 /* Song Select */ => {
-                    offset += bytes.len()
+                    offset += vlq.length
                 },
                 0xF4..=0xF5 /* Undefined (why tho?) */ => {},
                 0xF6 /* Tune Request */ => {
-                    offset += bytes.len() + 2;
+                    offset += vlq.length + 2;
                 },
                 0xF7 /* EndOfSysEx (wait what now) */ => {
-                    offset += bytes.len();
+                    offset += vlq.length;
                 },
                 0xF8 /* Timing Clock (makes sense) */ => {
-                    offset += bytes.len();
+                    offset += vlq.length;
                 },
                 0xF9 /* Undefined */ => {
-                    offset += bytes.len();
+                    offset += vlq.length;
                 },
                 0xFA /* Start */ => {
-                    offset += bytes.len();
+                    offset += vlq.length;
                 },
                 0xFB /* Continue */ => {
-                    offset += bytes.len();
+                    offset += vlq.length;
                 },
                 0xFC /* Stop */ => {
-                    offset += bytes.len();
+                    offset += vlq.length;
                 },
                 0xFF /* Meta Event */ => {
-                    println!("Meta event {:X}.", d[offset + bytes.len() + 1]);
-                    match d[offset + bytes.len() + 1] {
+                    println!("Meta event {:X}.", d[offset + vlq.length + 1]);
+                    match d[offset + vlq.length + 1] {
                         0x00 /* Sequence number */ => {},
                         0x01..=0x07 /* String-related things */ => {
                             println!("String event");
-                            offset += d[offset + bytes.len() + 2] as usize + bytes.len() + 3;
+                            offset += d[offset + vlq.length + 2] as usize + vlq.length + 3;
                         },
                         0x20 /* Channel Prefix */ => {},
                         0x2F /* End of track */ => {
-                            println!("Eot; {}, {:X}", status, d[offset + bytes.len() + 1]);
+                            println!("Eot; {}, {:X}", status, d[offset + vlq.length + 1]);
                             break;
                         },
                         0x51 /* Set Tempo */ => {
-                            offset += 3 + d[offset + bytes.len() + 2] as usize;
+                            offset += 3 + d[offset + vlq.length + 2] as usize;
                         },
                         0x54 /* SMTPE Offset */ => {},
                         0x58 /* Time Signature */ => {
-                            offset += bytes.len() + 6;
+                            offset += vlq.length + 6;
                         },
                         0x59 /* Key Signature */ => {
-                            offset += bytes.len() + 4;
+                            offset += vlq.length + 4;
                         },
                         0x7F /* Sequencer Specific */ => {},
                         _ => {
-                            println!("Unknown meta event; type is {:X}; length is {} bytes", d[offset + bytes.len() + 1], d[offset + bytes.len() + 2]);
-                            // offset += d[offset + bytes.len() + 2] as usize + bytes.len() + 3;
+                            println!("Unknown meta event; type is {:X}; length is {} bytes", d[offset + vlq.length + 1], d[offset + vlq.length + 2]);
                             break;
                         }
                     }
