@@ -88,32 +88,16 @@ static MESSAGE: [u8; include_bytes!("message.txt").len()] = *include_bytes!("mes
 static MESSAGE: [u8; include_bytes!("message.txt").len()] = *include_bytes!("message.txt");
 
 fn main() -> std::io::Result<()> {
-    let args: Vec<String> = std::env::args().collect::<Vec<String>>();
     let mut path = String::new();
-    if args.len() > 1 {
-        path = args[1].clone();
-    } else {
-        println!("Whar is the file:");
-        stdin().read_line(&mut path).unwrap();
+    let p = std::env::args().nth(1);
+    match p {
+        Some(n) => path = n,
+        None => {
+            println!("Whar is the file:");
+            stdin().read_line(&mut path).unwrap();
+        }
     }
-    if let Some('\n') = path.chars().next_back() {
-        path.pop();
-    }
-    if let Some('\r') = path.chars().next_back() {
-        path.pop();
-    }
-    if let Some('\"') = path.chars().next_back() {
-        path.pop();
-    }
-    if let Some('\"') = path.chars().rev().next_back() {
-        path.remove(0);
-    }
-    if let Some('\'') = path.chars().next_back() {
-        path.pop();
-    }
-    if let Some('\'') = path.chars().rev().next_back() {
-        path.remove(0);
-    }
+    path = path.trim_matches(&['\r', '\n', '"', '\'']).to_owned();
 
     if path.is_empty() {
         println!("You can't point me to nothing, sorry!");
@@ -122,8 +106,7 @@ fn main() -> std::io::Result<()> {
             "You can't point me to nothing, sorry!",
         ));
     }
-    let p = Path::new(&path);
-    let bytes = fs::read(p).unwrap();
+    let bytes = fs::read(Path::new(&path)).unwrap();
 
     let header: HeaderTrack = HeaderTrack {
         flag: [bytes[0], bytes[1], bytes[2], bytes[3]],
@@ -193,7 +176,7 @@ fn main() -> std::io::Result<()> {
         // let mut messages: Vec<Message> = vec![];
         loop {
             // let mut message = Message::new();
-            println!("{}", offset);
+            println!("Offset = {}", offset);
             let vlq = Vlq::from_bytes(&[d[offset], d[offset + 1], d[offset + 2], d[offset + 3]]);
 
             println!("D = {}", vlq.value);
@@ -258,11 +241,12 @@ fn main() -> std::io::Result<()> {
                 },
                 0xFF /* Meta Event */ => {
                     println!("Meta event {:X}.", d[offset + vlq.length + 1]);
+                    let meta_len = d[offset + vlq.length + 2] as usize + vlq.length + 3;
                     match d[offset + vlq.length + 1] {
                         0x00 /* Sequence number */ => {},
-                        0x01..=0x07 /* String-related things */ => {
+                        0x01..=0x07 /* Things that use meta lengths */ => {
                             println!("String event");
-                            offset += d[offset + vlq.length + 2] as usize + vlq.length + 3;
+                            offset += meta_len;
                         },
                         0x20 /* Channel Prefix */ => {},
                         0x2F /* End of track */ => {
@@ -270,23 +254,26 @@ fn main() -> std::io::Result<()> {
                             break;
                         },
                         0x51 /* Set Tempo */ => {
-                            offset += 3 + d[offset + vlq.length + 2] as usize;
+                            offset += meta_len;
                         },
                         0x54 /* SMTPE Offset */ => {},
                         0x58 /* Time Signature */ => {
-                            offset += vlq.length + 6;
+                            offset += meta_len;
                         },
                         0x59 /* Key Signature */ => {
-                            offset += vlq.length + 4;
+                            offset += meta_len;
                         },
                         0x7F /* Sequencer Specific */ => {},
                         _ => {
-                            println!("Unknown meta event; type is {:X}; length is {} bytes", d[offset + vlq.length + 1], d[offset + vlq.length + 2]);
+                            println!("Unknown meta event; type is {:X}; length is {} bytes", d[offset + vlq.length + 1], meta_len);
                             break;
                         }
                     }
                 },
-                _ => {println!("Unknown status {:X}", status); break;}
+                _ => {
+                    println!("Unknown status {:X}", status);
+                    break;
+                }
             }
         }
     }
