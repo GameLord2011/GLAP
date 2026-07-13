@@ -194,7 +194,7 @@ fn main() -> std::io::Result<()> {
                     offset += vlq.length + 3;
                 },
                 0xB0..=0xBF /* Control change */ => {
-                    offset += vlq.length + 3;
+                    offset += vlq.length + 2;
                 },
                 0xC0..=0xCF /* Program change */ => {
                     offset += vlq.length + 2;
