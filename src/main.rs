@@ -1,9 +1,11 @@
+extern crate sdl2;
+
 use std::{
-    io::{Error, ErrorKind, stdin},
-    path::Path,
+    io::stdin, path::Path, time::Duration,
 };
 
-use creak::{Decoder, SampleIterator};
+use creak::Decoder;
+use sdl2::audio::{AudioCallback, AudioSpecDesired};
 
 #[cfg(not(target_os = "macos"))]
 #[used]
@@ -15,7 +17,38 @@ static MESSAGE: [u8; include_bytes!("message.txt").len()] = *include_bytes!("mes
 #[unsafe(link_section = "__TEXT,__text")]
 static MESSAGE: [u8; include_bytes!("message.txt").len()] = *include_bytes!("message.txt");
 
+struct AudioPlayer {
+    samples: Vec<f32>,
+    whar_am_i: usize
+}
+
+impl AudioCallback for AudioPlayer {
+    type Channel = f32;
+
+    fn callback(&mut self, out: &mut [f32]) {
+        let remaining = self.samples.len().saturating_sub(self.whar_am_i);
+
+        if remaining == 0 {
+            for x in out.iter_mut() {
+                *x = 0_f32;
+            }
+            return;
+        }
+
+        let to_copy = remaining.min(out.len());
+        out[..to_copy].copy_from_slice(&self.samples[self.whar_am_i..self.whar_am_i + to_copy]);
+
+        if to_copy < out.len() {
+            for x in out[to_copy..].iter_mut() {
+                *x = 0_f32;
+            }
+        }
+    }
+}
+
 fn main() {
+    let sdl_context = sdl2::init().unwrap();
+    let audio_subsystem = sdl_context.audio().unwrap();
     let mut path = String::new();
     let p = std::env::args().nth(1);
     match p {
@@ -35,14 +68,18 @@ fn main() {
     let info = samples.info();
 
     println!("{}; {}; {}", info.channels(), info.format(), info.sample_rate());
-
-    let mut n = 0;
-    'sampler: for i in samples.into_samples().unwrap() {
-        n += 1;
-        let sample = i.unwrap();
-        println!("{sample}");
-        if n == 100000 {
-            break 'sampler;
+    let desired_spec = AudioSpecDesired {
+        freq: Some(info.sample_rate() as i32),
+        channels: Some(info.channels() as u8),
+        samples: None
+    };
+    let device = audio_subsystem.open_playback(None, &desired_spec, |_| {
+        AudioPlayer {
+            samples: samples.into_samples().unwrap().map(|s| s.unwrap()).collect::<Vec<f32>>(),
+            whar_am_i: 0
         }
-    }
+    }).unwrap();
+
+    device.resume();
+    std::thread::sleep(Duration::from_millis(2000));
 }
