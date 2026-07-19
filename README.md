@@ -13,3 +13,14 @@ At the time of writing (2026-07-17 at 1:34PM EST) I haven't tested it, but plan 
 ## Note to any of the shipwrights reading this (iykyk)
 
 Rupnil said I could rebrand this I have specific permission from him I can dm you a link to the thread if you want me to.
+
+## Building yourself
+
+- Follow the instructions on [this](https://github.com/Rust-SDL2/rust-sdl2) page for your platform
+- Run:
+
+```Bash
+cargo build
+```
+
+- That's it.

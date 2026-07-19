@@ -1,8 +1,6 @@
 extern crate sdl2;
 
-use std::{
-    io::stdin, path::Path, time::Duration,
-};
+use std::{io::stdin, path::Path, time::Duration};
 
 use creak::Decoder;
 use sdl2::audio::{AudioCallback, AudioSpecDesired};
@@ -19,28 +17,32 @@ static MESSAGE: [u8; include_bytes!("message.txt").len()] = *include_bytes!("mes
 
 struct AudioPlayer {
     samples: Vec<f32>,
-    whar_am_i: usize
+    whar_am_i: usize,
 }
 
 impl AudioCallback for AudioPlayer {
     type Channel = f32;
 
     fn callback(&mut self, out: &mut [f32]) {
-        let remaining = self.samples.len().saturating_sub(self.whar_am_i);
-
-        if remaining == 0 {
+        let d = self.samples.len();
+        if self.whar_am_i > d {
             for x in out.iter_mut() {
-                *x = 0_f32;
+                *x = 0_f32
             }
-            return;
-        }
-
-        let to_copy = remaining.min(out.len());
-        out[..to_copy].copy_from_slice(&self.samples[self.whar_am_i..self.whar_am_i + to_copy]);
-
-        if to_copy < out.len() {
-            for x in out[to_copy..].iter_mut() {
-                *x = 0_f32;
+        } else {
+            let l = out.len();
+            let next = self.whar_am_i + l;
+            if next > d {
+                let left = next - d;
+                let can_copy = out.len() - left;
+                out[..can_copy].copy_from_slice(&self.samples[self.whar_am_i..]);
+                self.whar_am_i += l;
+                for i in out[left..].iter_mut() {
+                    *i = 0_f32
+                }
+            } else {
+                out[..l].copy_from_slice(&self.samples[self.whar_am_i..self.whar_am_i + l]);
+                self.whar_am_i += l;
             }
         }
     }
@@ -58,7 +60,7 @@ fn main() {
             stdin().read_line(&mut path).unwrap();
         }
     }
-    path = path.trim_matches(&['\r', '\n', '"', '\'']).to_owned();
+    path = path.trim_matches(['\r', '\n', '"', '\'']).to_owned();
 
     if path.is_empty() {
         println!("You can't point me to nothing, sorry!");
@@ -67,19 +69,28 @@ fn main() {
     let samples = Decoder::open(Path::new(&path)).unwrap();
     let info = samples.info();
 
-    println!("{}; {}; {}", info.channels(), info.format(), info.sample_rate());
+    println!(
+        "{}; {}; {}",
+        info.channels(),
+        info.format(),
+        info.sample_rate()
+    );
     let desired_spec = AudioSpecDesired {
         freq: Some(info.sample_rate() as i32),
         channels: Some(info.channels() as u8),
-        samples: None
+        samples: None,
     };
-    let device = audio_subsystem.open_playback(None, &desired_spec, |_| {
-        AudioPlayer {
-            samples: samples.into_samples().unwrap().map(|s| s.unwrap()).collect::<Vec<f32>>(),
-            whar_am_i: 0
-        }
-    }).unwrap();
+    let device = audio_subsystem
+        .open_playback(None, &desired_spec, |_| AudioPlayer {
+            samples: samples
+                .into_samples()
+                .unwrap()
+                .map(|s| s.unwrap())
+                .collect::<Vec<f32>>(),
+            whar_am_i: 0,
+        })
+        .unwrap();
 
     device.resume();
-    std::thread::sleep(Duration::from_millis(2000));
+    std::thread::sleep(Duration::from_secs(50));
 }
