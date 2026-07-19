@@ -15,6 +15,13 @@ static MESSAGE: [u8; include_bytes!("message.txt").len()] = *include_bytes!("mes
 #[unsafe(link_section = "__TEXT,__text")]
 static MESSAGE: [u8; include_bytes!("message.txt").len()] = *include_bytes!("message.txt");
 
+enum Page {
+    Home,
+    About,
+    Player,
+    Settings
+}
+
 struct AudioPlayer {
     samples: Vec<f32>,
     whar_am_i: usize,
@@ -70,27 +77,34 @@ fn main() {
     let info = samples.info();
 
     println!(
-        "{}; {}; {}",
+        "{} channels; format: {}; sample rate: {}",
         info.channels(),
         info.format(),
         info.sample_rate()
     );
+    println!("Starting Processing");
     let desired_spec = AudioSpecDesired {
         freq: Some(info.sample_rate() as i32),
         channels: Some(info.channels() as u8),
         samples: None,
     };
+    println!("Desired Spec Built");
+    let s = samples
+        .into_samples()
+        .unwrap()
+        .map(|s| s.unwrap())
+        .collect::<Vec<f32>>();
+    println!("Samples Vector Built");
     let device = audio_subsystem
         .open_playback(None, &desired_spec, |_| AudioPlayer {
-            samples: samples
-                .into_samples()
-                .unwrap()
-                .map(|s| s.unwrap())
-                .collect::<Vec<f32>>(),
+            samples: s.clone(),
             whar_am_i: 0,
         })
         .unwrap();
+    println!("Device opened");
 
+    let secs = (s.len() as f64 / info.channels() as f64) / info.sample_rate() as f64;
     device.resume();
-    std::thread::sleep(Duration::from_secs(50));
+    println!("Playing!");
+    std::thread::sleep(Duration::from_secs_f64(secs));
 }
