@@ -1,9 +1,15 @@
 extern crate sdl2;
 
-use std::{io::stdin, path::Path, time::Duration};
+use std::{default::Default, fs::File, io::stdin, time::Duration};
 
-use creak::Decoder;
 use sdl2::audio::{AudioCallback, AudioSpecDesired};
+use symphonia::core::{
+    codecs::audio::AudioDecoderOptions,
+    errors::Error,
+    formats::{FormatOptions, TrackType, probe::Hint},
+    io::MediaSourceStream,
+    meta::MetadataOptions,
+};
 
 #[cfg(not(target_os = "macos"))]
 #[used]
@@ -19,7 +25,7 @@ enum Page {
     Home,
     About,
     Player,
-    Settings
+    Settings,
 }
 
 struct AudioPlayer {
@@ -73,38 +79,76 @@ fn main() {
         println!("You can't point me to nothing, sorry!");
     }
 
-    let samples = Decoder::open(Path::new(&path)).unwrap();
-    let info = samples.info();
+    let file = Box::new(File::open(path).unwrap());
+    let mss = MediaSourceStream::new(file, Default::default());
 
+    let hint = Hint::new();
+
+    let fmt_opts: FormatOptions = Default::default();
+    let meta_opts: MetadataOptions = Default::default();
+    let dec_opts: AudioDecoderOptions = Default::default();
+
+    let mut format = symphonia::default::get_probe()
+        .probe(&hint, mss, fmt_opts, meta_opts)
+        .unwrap();
+
+    let track = format.default_track(TrackType::Audio).unwrap().clone();
+
+    let mut decoder = symphonia::default::get_codecs()
+        .make_audio_decoder(
+            track.codec_params.as_ref().unwrap().audio().unwrap(),
+            &dec_opts,
+        )
+        .unwrap();
+    let track_id = track.id;
+    let mut samples: Vec<f32> = Default::default();
+
+    while let Some(packet) = format.next_packet().unwrap() {
+        if packet.track_id != track_id {
+            continue;
+        }
+
+        match decoder.decode(&packet) {
+            Ok(audio_buf) => {
+                samples.resize(audio_buf.samples_interleaved(), 0_f32); // Flood the vec with zeros(?);
+                audio_buf.copy_to_slice_interleaved(&mut samples);
+            }
+            Err(Error::DecodeError(_)) => (),
+            Err(_) => break,
+        }
+    }
+
+    let binding = track.codec_params.unwrap();
+    let info = binding.audio().unwrap();
+    let sample_rate = info.sample_rate.unwrap();
+    let channels_count = info.channels.to_owned().unwrap().count();
     println!(
-        "{} channels; format: {}; sample rate: {}",
-        info.channels(),
-        info.format(),
-        info.sample_rate()
+        "{} channels; sample rate: {}",
+        channels_count,
+        sample_rate
     );
     println!("Starting Processing");
     let desired_spec = AudioSpecDesired {
-        freq: Some(info.sample_rate() as i32),
-        channels: Some(info.channels() as u8),
+        freq: Some(sample_rate as i32),
+        channels: Some(channels_count as u8),
         samples: None,
     };
     println!("Desired Spec Built");
-    let s = samples
-        .into_samples()
-        .unwrap()
-        .map(|s| s.unwrap())
-        .collect::<Vec<f32>>();
     println!("Samples Vector Built");
     let device = audio_subsystem
         .open_playback(None, &desired_spec, |_| AudioPlayer {
-            samples: s.clone(),
+            samples: samples.clone(),
             whar_am_i: 0,
         })
         .unwrap();
     println!("Device opened");
+    println!("{}", samples.len());
 
-    let secs = (s.len() as f64 / info.channels() as f64) / info.sample_rate() as f64;
-    device.resume();
-    println!("Playing!");
-    std::thread::sleep(Duration::from_secs_f64(secs));
+    // let secs = (samples.len() as f64 / channels_count as f64) / sample_rate as f64;
+    // let secs = binding.audio().unwrap().t
+    // println!("{secs}");
+    // device.resume();
+    // println!("Playing!");
+    // std::thread::sleep(Duration::from_secs_f64(secs));
+    // std::thread::sleep(Duration::from_secs(2));
 }
