@@ -3,6 +3,11 @@ name = "rmidi"
 version = "0.1.0"
 edition = "2024"
 
+[profile.release]
+strip = "symbols"
+panic = "abort"
+lto = "fat"
+
 [dependencies]
 creak = "0.3.0"
 sdl2 = "0.38.0"

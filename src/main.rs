@@ -2,7 +2,7 @@ extern crate sdl2;
 
 use std::{default::Default, fs::File, io::stdin, time::Duration};
 
-use sdl2::audio::{AudioCallback, AudioSpecDesired};
+use sdl2::{audio::{AudioCallback, AudioSpecDesired}};
 use symphonia::core::{
     codecs::audio::AudioDecoderOptions,
     errors::Error,
@@ -21,7 +21,7 @@ static MESSAGE: [u8; include_bytes!("message.txt").len()] = *include_bytes!("mes
 #[unsafe(link_section = "__TEXT,__text")]
 static MESSAGE: [u8; include_bytes!("message.txt").len()] = *include_bytes!("message.txt");
 
-enum Page {
+enum Page { // TODO: TUI (likely RataTUI)
     Home,
     About,
     Player,
@@ -103,6 +103,9 @@ fn main() {
     let track_id = track.id;
     let mut samples: Vec<f32> = Default::default();
 
+    #[cfg(debug_assertions)] {
+        println!("Starting audio sample parsing. This can take a fat minute in dev so be patient.");
+    }
     while let Some(packet) = format.next_packet().unwrap() {
         if packet.track_id != track_id {
             continue;
@@ -110,13 +113,16 @@ fn main() {
 
         match decoder.decode(&packet) {
             Ok(audio_buf) => {
-                samples.resize(audio_buf.samples_interleaved(), 0_f32); // Flood the vec with zeros(?);
-                audio_buf.copy_to_slice_interleaved(&mut samples);
+                let mut t: Vec<f32> = Default::default();
+                t.resize(audio_buf.samples_interleaved(), 0_f32);
+                audio_buf.copy_to_slice_interleaved(&mut t);
+                samples.append(&mut t);
             }
             Err(Error::DecodeError(_)) => (),
             Err(_) => break,
         }
     }
+    println!("{:?}", samples.len());
 
     let binding = track.codec_params.unwrap();
     let info = binding.audio().unwrap();
@@ -144,11 +150,9 @@ fn main() {
     println!("Device opened");
     println!("{}", samples.len());
 
-    // let secs = (samples.len() as f64 / channels_count as f64) / sample_rate as f64;
-    // let secs = binding.audio().unwrap().t
-    // println!("{secs}");
-    // device.resume();
-    // println!("Playing!");
-    // std::thread::sleep(Duration::from_secs_f64(secs));
-    // std::thread::sleep(Duration::from_secs(2));
+    let secs = (samples.len() as f64 / channels_count as f64) / sample_rate as f64;
+    println!("{secs}");
+    device.resume();
+    println!("Playing!");
+    std::thread::sleep(Duration::from_secs_f64(secs));
 }
