@@ -7,6 +7,7 @@ edition = "2024"
 strip = "symbols"
 panic = "abort"
 lto = "fat"
+codegen-units = 1
 
 [dependencies]
 creak = "0.3.0"
