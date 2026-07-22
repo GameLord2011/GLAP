@@ -11,4 +11,4 @@ lto = "fat"
 [dependencies]
 creak = "0.3.0"
 sdl2 = "0.38.0"
-symphonia = {version = "0.6.0", features = ["all-codecs", "mpa"]}
+symphonia = {version = "0.6.0", features = ["all-codecs"]}
