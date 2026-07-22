@@ -46,14 +46,14 @@ impl AudioCallback for AudioPlayer {
             let l = out.len();
             let next = self.whar_am_i + l;
             if next > d {
-                let can_copy = out.len() - next - d;
+                let can_copy = l - (next - d);
                 out[..can_copy].copy_from_slice(&self.samples[self.whar_am_i..]);
                 self.whar_am_i += l;
                 for i in out[can_copy..].iter_mut() {
                     *i = 0_f32
                 }
             } else {
-                out[..l].copy_from_slice(&self.samples[self.whar_am_i..self.whar_am_i + l]);
+                out.copy_from_slice(&self.samples[self.whar_am_i..self.whar_am_i + l]);
                 self.whar_am_i += l;
             }
         }
