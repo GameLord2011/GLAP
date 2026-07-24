@@ -1,8 +1,11 @@
 extern crate sdl2;
 
-use std::{default::Default, fs::File, io::stdin, time::Duration};
+mod audio_player;
+mod player;
 
-use sdl2::{audio::{AudioCallback, AudioSpecDesired}};
+use std::{default::Default, fs::File, io::stdin};
+
+// use ratatui::DefaultTerminal;
 use symphonia::core::{
     codecs::audio::AudioDecoderOptions,
     errors::Error,
@@ -10,6 +13,8 @@ use symphonia::core::{
     io::MediaSourceStream,
     meta::MetadataOptions,
 };
+
+use crate::audio_player::AudioPlayer;
 
 #[cfg(not(target_os = "macos"))]
 #[used]
@@ -21,46 +26,15 @@ static MESSAGE: [u8; include_bytes!("message.txt").len()] = *include_bytes!("mes
 #[unsafe(link_section = "__TEXT,__text")]
 static MESSAGE: [u8; include_bytes!("message.txt").len()] = *include_bytes!("message.txt");
 
-enum Page { // TODO: TUI (likely RataTUI)
-    Home,
-    About,
-    Player,
-    Settings,
-}
+// enum Page { // TODO: TUI (RataTUI)
+//     Home,
+//     About,
+//     Player,
+//     Settings,
+// }
 
-struct AudioPlayer {
-    samples: Vec<f32>,
-    whar_am_i: usize,
-}
-
-impl AudioCallback for AudioPlayer {
-    type Channel = f32;
-
-    fn callback(&mut self, out: &mut [f32]) {
-        let d = self.samples.len();
-        if self.whar_am_i > d {
-            for x in out.iter_mut() {
-                *x = 0_f32
-            }
-        } else {
-            let l = out.len();
-            let next = self.whar_am_i + l;
-            if next > d {
-                let can_copy = l - (next - d);
-                out[..can_copy].copy_from_slice(&self.samples[self.whar_am_i..]);
-                self.whar_am_i += l;
-                for i in out[can_copy..].iter_mut() {
-                    *i = 0_f32
-                }
-            } else {
-                out.copy_from_slice(&self.samples[self.whar_am_i..self.whar_am_i + l]);
-                self.whar_am_i += l;
-            }
-        }
-    }
-}
-
-fn main() {
+fn main() -> color_eyre::Result<()> {
+    color_eyre::install()?;
     let sdl_context = sdl2::init().unwrap();
     let audio_subsystem = sdl_context.audio().unwrap();
     let mut path = String::new();
@@ -69,7 +43,7 @@ fn main() {
         Some(n) => path = n,
         None => {
             println!("Whar is the file:");
-            stdin().read_line(&mut path).unwrap();
+            stdin().read_line(&mut path)?;
         }
     }
     path = path.trim_matches(['\r', '\n', '"', '\'']).to_owned();
@@ -77,6 +51,12 @@ fn main() {
     if path.is_empty() {
         println!("You can't point me to nothing, sorry!");
     }
+
+    let mut v = String::new();
+    println!("What do you want the volume to be out of 100?");
+    stdin().read_line(&mut v)?;
+    let d = v.trim_end().parse::<u8>().unwrap_or(100_u8);
+    let volume = d as f32 / 100_f32;
 
     let file = Box::new(File::open(path).unwrap());
     let mss = MediaSourceStream::new(file, Default::default());
@@ -102,7 +82,8 @@ fn main() {
     let track_id = track.id;
     let mut samples: Vec<f32> = Default::default();
 
-    #[cfg(debug_assertions)] {
+    #[cfg(debug_assertions)]
+    {
         println!("Starting audio sample parsing. This can take a fat minute in dev so be patient.");
     }
     while let Some(packet) = format.next_packet().unwrap() {
@@ -121,37 +102,25 @@ fn main() {
             Err(_) => break,
         }
     }
+    if volume != 1_f32 {
+        samples = samples.iter().map(|f| f * volume).collect::<Vec<f32>>()
+    }
     println!("{:?}", samples.len());
 
     let binding = track.codec_params.unwrap();
     let info = binding.audio().unwrap();
     let sample_rate = info.sample_rate.unwrap();
     let channels_count = info.channels.to_owned().unwrap().count();
-    println!(
-        "{} channels; sample rate: {}",
-        channels_count,
-        sample_rate
-    );
+    println!("{} channels; sample rate: {}", channels_count, sample_rate);
     println!("Starting Processing");
-    let desired_spec = AudioSpecDesired {
-        freq: Some(sample_rate as i32),
-        channels: Some(channels_count as u8),
-        samples: None,
-    };
-    println!("Desired Spec Built");
-    println!("Samples Vector Built");
-    let device = audio_subsystem
-        .open_playback(None, &desired_spec, |_| AudioPlayer {
-            samples: samples.clone(),
-            whar_am_i: 0,
-        })
-        .unwrap();
-    println!("Device opened");
-    println!("{}", samples.len());
-
-    let secs = (samples.len() as f64 / channels_count as f64) / sample_rate as f64;
-    println!("{secs}");
-    device.resume();
-    println!("Playing!");
-    std::thread::sleep(Duration::from_secs_f64(secs));
+    let audio_player = std::sync::Arc::new(std::sync::Mutex::new(AudioPlayer::new(samples, sample_rate, channels_count)));
+    // player::play(
+    //     AudioPlayer::new(samples, sample_rate, channels_count),
+    //     audio_subsystem,
+    // );
+    Ok(())
 }
+
+// fn app(terminal: &mut DefaultTerminal) {
+
+// }
