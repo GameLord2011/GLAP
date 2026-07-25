@@ -2,10 +2,12 @@ extern crate sdl2;
 
 mod audio_player;
 mod player;
+mod app;
 
 use std::{default::Default, fs::File, io::stdin, time::Duration};
 
-// use ratatui::DefaultTerminal;
+// use crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyEventState, KeyModifiers};
+// use ratatui::{DefaultTerminal, Frame, style::Style, widgets::{Block, Borders, Paragraph, RatatuiLogo}};
 use symphonia::core::{
     codecs::audio::AudioDecoderOptions,
     errors::Error,
@@ -26,15 +28,17 @@ static MESSAGE: [u8; include_bytes!("message.txt").len()] = *include_bytes!("mes
 #[unsafe(link_section = "__TEXT,__text")]
 static MESSAGE: [u8; include_bytes!("message.txt").len()] = *include_bytes!("message.txt");
 
-// enum Page { // TODO: TUI (RataTUI)
-//     Home,
-//     About,
-//     Player,
-//     Settings,
-// }
+enum Page {
+    Home,
+    About,
+    Player,
+    Settings,
+}
 
 fn main() -> color_eyre::Result<()> {
     color_eyre::install()?;
+    let config_dir = dirs::config_dir().unwrap();
+    let music_folder = dirs::audio_dir().unwrap();
     let sdl_context = sdl2::init().unwrap();
     let audio_subsystem = sdl_context.audio().unwrap();
     let mut path = String::new();
@@ -55,8 +59,8 @@ fn main() -> color_eyre::Result<()> {
     let mut v = String::new();
     println!("What do you want the volume to be out of 100?");
     stdin().read_line(&mut v)?;
-    let d = v.trim_end().parse::<u8>().unwrap_or(100_u8);
-    let volume = d as f32 / 100_f32;
+    let d = v.trim_end().parse::<f32>().unwrap_or(100_f32);
+    let volume = d / 100_f32;
 
     let file = Box::new(File::open(path).unwrap());
     let mss = MediaSourceStream::new(file, Default::default());
@@ -102,9 +106,6 @@ fn main() -> color_eyre::Result<()> {
             Err(_) => break,
         }
     }
-    if volume != 1_f32 {
-        samples = samples.iter().map(|f| f * volume).collect::<Vec<f32>>()
-    }
     println!("{:?}", samples.len());
 
     let binding = track.codec_params.unwrap();
@@ -113,19 +114,16 @@ fn main() -> color_eyre::Result<()> {
     let channels_count = info.channels.to_owned().unwrap().count();
     println!("{} channels; sample rate: {}", channels_count, sample_rate);
     println!("Starting Processing");
-    let (secs, mut d) = player::play(
-        AudioPlayer::new(samples, sample_rate, channels_count),
+    let five_seconds = Duration::from_secs(5);
+    let (secs, mut d) = player::create_device(
+        AudioPlayer::new(samples, sample_rate, channels_count, volume).unwrap(),
         audio_subsystem,
     );
     d.resume();
-    std::thread::sleep(Duration::from_secs(5));
-    d.lock().play = false;
-    std::thread::sleep(Duration::from_secs(5));
-    d.lock().play = true;
+    std::thread::sleep(five_seconds);
+    d.lock().volume = 0.5_f32;
+    std::thread::sleep(five_seconds);
+    d.lock().volume = 1_f32;
     std::thread::sleep(Duration::from_secs_f64(secs));
     Ok(())
 }
-
-// fn app(terminal: &mut DefaultTerminal) {
-
-// }

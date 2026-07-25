@@ -5,7 +5,7 @@ use sdl2::{
 
 use crate::audio_player::AudioPlayer;
 
-pub fn play(
+pub fn create_device(
     audio_player: AudioPlayer,
     subsystem: AudioSubsystem,
 ) -> (f64, AudioDevice<AudioPlayer>) {

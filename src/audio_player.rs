@@ -1,3 +1,4 @@
+use color_eyre::eyre::eyre;
 use sdl2::audio::AudioCallback;
 
 /**
@@ -11,6 +12,7 @@ use sdl2::audio::AudioCallback;
 pub struct AudioPlayer {
     pub samples: Vec<f32>,
     pub sample_rate: u32,
+    pub volume: f32,
     pub channels: usize,
     pub play: bool,
     pub finished: bool,
@@ -18,15 +20,28 @@ pub struct AudioPlayer {
 }
 
 impl AudioPlayer {
-    pub fn new(samples: Vec<f32>, sample_rate: u32, channels: usize) -> Self {
-        Self {
+    pub fn new(
+        samples: Vec<f32>,
+        sample_rate: u32,
+        channels: usize,
+        volume: f32,
+    ) -> Result<Self, color_eyre::eyre::Error> {
+        if volume > 1_f32 {
+            Err::<Self, color_eyre::eyre::ErrReport>(eyre!("Volume cannot be greater than 1"))?;
+        }
+        Ok(Self {
             samples,
             sample_rate,
+            volume,
             channels,
             play: true,
             finished: false,
             whar_am_i: 0,
-        }
+        })
+    }
+
+    pub fn get_progress(self) -> usize {
+        return self.whar_am_i / self.samples.len();
     }
 }
 
@@ -43,7 +58,7 @@ impl AudioCallback for AudioPlayer {
             let l = out.len();
             let next = self.whar_am_i + l;
             if next > d {
-                let can_copy = l - (next - d);
+                let can_copy = d - self.whar_am_i;
                 out[..can_copy].copy_from_slice(&self.samples[self.whar_am_i..]);
                 for i in out[can_copy..].iter_mut() {
                     *i = 0_f32
@@ -52,6 +67,11 @@ impl AudioCallback for AudioPlayer {
             } else {
                 out.copy_from_slice(&self.samples[self.whar_am_i..self.whar_am_i + l]);
                 self.whar_am_i += l;
+            }
+            if self.volume != 1_f32 {
+                for x in out.iter_mut() {
+                    *x = *x * self.volume;
+                }
             }
         }
     }
