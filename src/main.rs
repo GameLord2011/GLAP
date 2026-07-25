@@ -3,7 +3,7 @@ extern crate sdl2;
 mod audio_player;
 mod player;
 
-use std::{default::Default, fs::File, io::stdin};
+use std::{default::Default, fs::File, io::stdin, time::Duration};
 
 // use ratatui::DefaultTerminal;
 use symphonia::core::{
@@ -113,11 +113,16 @@ fn main() -> color_eyre::Result<()> {
     let channels_count = info.channels.to_owned().unwrap().count();
     println!("{} channels; sample rate: {}", channels_count, sample_rate);
     println!("Starting Processing");
-    let audio_player = std::sync::Arc::new(std::sync::Mutex::new(AudioPlayer::new(samples, sample_rate, channels_count)));
-    // player::play(
-    //     AudioPlayer::new(samples, sample_rate, channels_count),
-    //     audio_subsystem,
-    // );
+    let (secs, mut d) = player::play(
+        AudioPlayer::new(samples, sample_rate, channels_count),
+        audio_subsystem,
+    );
+    d.resume();
+    std::thread::sleep(Duration::from_secs(5));
+    d.lock().play = false;
+    std::thread::sleep(Duration::from_secs(5));
+    d.lock().play = true;
+    std::thread::sleep(Duration::from_secs_f64(secs));
     Ok(())
 }
 
