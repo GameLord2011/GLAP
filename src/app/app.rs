@@ -1,4 +1,4 @@
-use std::io;
+use std::{io, time::Duration};
 
 use crossterm::event::{Event::Key, KeyCode, KeyEvent, KeyEventKind, KeyEventState, KeyModifiers};
 use ratatui::{
@@ -11,7 +11,7 @@ use ratatui::{
 };
 use sdl2::{AudioSubsystem, audio::AudioDevice};
 
-use crate::audio::{self, audio_player::AudioPlayer};
+use crate::audio::{self, audio_player::AudioPlayer, player::create_device};
 
 #[derive(Default)]
 enum Page {
@@ -23,13 +23,20 @@ enum Page {
 #[derive(Default)]
 pub struct App {
     page: Page,
+    helper_thread_handle: Option<std::thread::JoinHandle<AudioPlayer>>,
+    audio_path: String,
+    should_make_new_device: bool,
     current_device: Option<AudioDevice<AudioPlayer>>,
     audio_created: bool,
     exit: bool,
 }
 
 impl App {
-    pub fn run(&mut self, terminal: &mut DefaultTerminal, audio_subsystem: AudioSubsystem) -> io::Result<()> {
+    pub fn run(
+        &mut self,
+        terminal: &mut DefaultTerminal,
+        audio_subsystem: AudioSubsystem,
+    ) -> io::Result<()> {
         loop {
             terminal.draw(|frame| self.draw(frame))?;
             self.handle_events(&audio_subsystem)?;
@@ -84,34 +91,51 @@ impl App {
     }
 
     fn handle_events(&mut self, audio_subsystem: &AudioSubsystem) -> io::Result<()> {
-        match crossterm::event::read()? {
-            Key(KeyEvent {
-                code: KeyCode::Char('a'),
-                modifiers: KeyModifiers::CONTROL,
-                kind: KeyEventKind::Press,
-                state: KeyEventState::NONE,
-            }) => {
-                self.page = Page::About;
-                if !self.audio_created {
-                    let player = audio::player::process_samples_from_file(dirs::audio_dir().unwrap().to_str().unwrap().to_owned() + "/sans.ogg", 1_f32);
-                    self.current_device = Some(audio::player::create_device(player, audio_subsystem.clone()).1);
+        if !self.audio_created {
+            if self.helper_thread_handle.is_none() {
+                self.helper_thread_handle = Some(audio::player::process_samples_from_file(
+                    dirs::audio_dir().unwrap().to_str().unwrap().to_owned() + "/sans.ogg",
+                    1_f32,
+                ));
+            } else {
+                if self.helper_thread_handle.as_ref().unwrap().is_finished() {
+                    let d = self.helper_thread_handle.take().unwrap().join().unwrap();
+                    self.current_device = Some(create_device(d, audio_subsystem.clone()).1);
                     self.current_device.as_mut().unwrap().resume();
                     self.audio_created = true;
                 }
-            },
-            Key(KeyEvent {
-                code: KeyCode::Char('p'),
-                modifiers: KeyModifiers::CONTROL,
-                kind: KeyEventKind::Press,
-                state: KeyEventState::NONE,
-            }) => self.page = Page::Player,
-            Key(KeyEvent {
-                code: KeyCode::Char('q'),
-                modifiers: KeyModifiers::CONTROL,
-                kind: KeyEventKind::Press,
-                state: KeyEventState::NONE,
-            }) => self.exit = true,
-            _ => (),
+            }
+        }
+        if crossterm::event::poll(Duration::from_millis(50))? {
+            match crossterm::event::read()? {
+                Key(KeyEvent {
+                    code: KeyCode::Char('a'),
+                    modifiers: KeyModifiers::CONTROL,
+                    kind: KeyEventKind::Press,
+                    state: KeyEventState::NONE,
+                }) => {
+                    self.page = Page::About;
+                    // if !self.audio_created {
+                    //     let player = audio::player::process_samples_from_file(dirs::audio_dir().unwrap().to_str().unwrap().to_owned() + "/sans.ogg", 1_f32);
+                    //     self.current_device = Some(audio::player::create_device(player, audio_subsystem.clone()).1);
+                    //     self.current_device.as_mut().unwrap().resume();
+                    //     self.audio_created = true;
+                    // }
+                }
+                Key(KeyEvent {
+                    code: KeyCode::Char('p'),
+                    modifiers: KeyModifiers::CONTROL,
+                    kind: KeyEventKind::Press,
+                    state: KeyEventState::NONE,
+                }) => self.page = Page::Player,
+                Key(KeyEvent {
+                    code: KeyCode::Char('q'),
+                    modifiers: KeyModifiers::CONTROL,
+                    kind: KeyEventKind::Press,
+                    state: KeyEventState::NONE,
+                }) => self.exit = true,
+                _ => (),
+            }
         }
         Ok(())
     }

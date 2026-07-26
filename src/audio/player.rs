@@ -33,8 +33,11 @@ pub fn create_device(
     (secs, device)
 }
 
-pub fn process_samples_from_file(path: String, volume: f32) -> AudioPlayer {
-    let d: std::thread::JoinHandle<AudioPlayer> = std::thread::spawn(move || {
+pub fn process_samples_from_file(
+    path: String,
+    volume: f32,
+) -> std::thread::JoinHandle<AudioPlayer> {
+    std::thread::spawn(move || {
         let file = Box::new(File::open(path).unwrap());
         let mss = MediaSourceStream::new(file, Default::default());
 
@@ -90,7 +93,5 @@ pub fn process_samples_from_file(path: String, volume: f32) -> AudioPlayer {
         // println!("{} channels; sample rate: {}", channels_count, sample_rate);
         // println!("Starting Processing");
         AudioPlayer::new(samples, sample_rate, channels_count, volume).unwrap()
-    });
-
-    d.join().unwrap()
+    })
 }
