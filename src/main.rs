@@ -1,22 +1,7 @@
 extern crate sdl2;
 
 mod app;
-mod audio_player;
-mod player;
-
-use std::{default::Default, fs::File, io::stdin, time::Duration};
-
-// use crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyEventState, KeyModifiers};
-// use ratatui::{DefaultTerminal, Frame, style::Style, widgets::{Block, Borders, Paragraph, RatatuiLogo}};
-use symphonia::core::{
-    codecs::audio::AudioDecoderOptions,
-    errors::Error,
-    formats::{FormatOptions, TrackType, probe::Hint},
-    io::MediaSourceStream,
-    meta::MetadataOptions,
-};
-
-use crate::audio_player::AudioPlayer;
+mod audio;
 
 #[cfg(not(target_os = "macos"))]
 #[used]
@@ -28,16 +13,11 @@ static MESSAGE: [u8; include_bytes!("message.txt").len()] = *include_bytes!("mes
 #[unsafe(link_section = "__TEXT,__text")]
 static MESSAGE: [u8; include_bytes!("message.txt").len()] = *include_bytes!("message.txt");
 
-enum Page {
-    Home,
-    About,
-    Player,
-    Settings,
-}
-
 fn main() -> color_eyre::Result<()> {
     color_eyre::install()?;
-    ratatui::run(|terminal| crate::app::App::default().run(terminal))?;
+    let sdl_context = sdl2::init().unwrap();
+    let audio_subsystem = sdl_context.audio().unwrap();
+    ratatui::run(|terminal| crate::app::app::App::default().run(terminal, audio_subsystem))?;
     // let config_dir = dirs::config_dir().unwrap();
     // let music_folder = dirs::audio_dir().unwrap();
     // let sdl_context = sdl2::init().unwrap();
