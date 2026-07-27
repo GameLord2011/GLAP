@@ -40,8 +40,8 @@ impl AudioPlayer {
         })
     }
 
-    pub fn get_progress(self) -> usize {
-        return self.whar_am_i / self.samples.len();
+    pub fn get_progress(self) -> f64 {
+        return self.whar_am_i as f64 / self.samples.len() as f64;
     }
 }
 

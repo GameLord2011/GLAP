@@ -17,7 +17,7 @@ fn main() -> color_eyre::Result<()> {
     color_eyre::install()?;
     let sdl_context = sdl2::init().unwrap();
     let audio_subsystem = sdl_context.audio().unwrap();
-    ratatui::run(|terminal| crate::app::app::App::default().run(terminal, audio_subsystem))?;
+    ratatui::run(|terminal| crate::app::app::App::new().run(terminal, audio_subsystem))?;
     // let config_dir = dirs::config_dir().unwrap();
     // let music_folder = dirs::audio_dir().unwrap();
     // let sdl_context = sdl2::init().unwrap();

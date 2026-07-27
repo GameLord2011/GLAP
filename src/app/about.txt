@@ -1,1 +1,6 @@
-GameLord's Audio Player (GLAP) is an audio player, written in Rust. Why? Why not. I like rust, so I thought "Audio player? MAKE IT IN RUST!" and it led to this. AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+GameLord's Audio Player (GLAP) is an audio player, written in Rust. Why? Why not. I like rust, so I thought "Audio player? MAKE IT IN RUST!" and it led to this.
+
+Credits:
+ - RataTUI for a nicely structured TUI library.
+ - Symphonia for a easy to use audio parser.
+ - SDL2 for a simple and direct media layer.
