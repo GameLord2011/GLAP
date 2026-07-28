@@ -1,9 +1,10 @@
 [package]
-name = "rmidi"
+name = "GLAP"
 version = "0.1.0"
 edition = "2024"
 
 [profile.release]
+opt-level = "s"
 strip = "symbols"
 panic = "abort"
 lto = "fat"

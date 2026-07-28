@@ -1,3 +1,9 @@
+GGGGG   L       AAAAA   PPPPP
+G       L       A   A   P   P
+G  GG   L       AAAAA   PPPPP
+G   G   L       A   A   P
+GGGGG   LLLLL   A   A   P
+
 GameLord's Audio Player (GLAP) is an audio player, written in Rust. Why? Why not. I like rust, so I thought "Audio player? MAKE IT IN RUST!" and it led to this.
 
 Credits:

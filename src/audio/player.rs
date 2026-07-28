@@ -1,4 +1,8 @@
-use std::{default::Default, fs::File};
+use std::{
+    default::Default,
+    fs::File,
+    io::{Error as E, ErrorKind},
+};
 
 use sdl2::{
     AudioSubsystem,
@@ -36,8 +40,9 @@ pub fn create_device(
 pub fn process_samples_from_file(
     path: String,
     volume: f32,
-) -> std::thread::JoinHandle<AudioPlayer> {
+) -> std::thread::JoinHandle<Result<AudioPlayer, E>> {
     std::thread::spawn(move || {
+        let ap: AudioPlayer;
         let file = Box::new(File::open(path).unwrap());
         let mss = MediaSourceStream::new(file, Default::default());
 
@@ -47,51 +52,55 @@ pub fn process_samples_from_file(
         let meta_opts: MetadataOptions = Default::default();
         let dec_opts: AudioDecoderOptions = Default::default();
 
-        let mut format = symphonia::default::get_probe()
-            .probe(&hint, mss, fmt_opts, meta_opts)
-            .unwrap();
+        let format = symphonia::default::get_probe().probe(&hint, mss, fmt_opts, meta_opts);
 
-        let track = format.default_track(TrackType::Audio).unwrap().clone();
+        if format.is_err() {
+            return Err(E::new(
+                ErrorKind::Other,
+                format!("{}", format.err().unwrap()),
+            ));
+        } else {
+            let mut good_format = format.unwrap();
+            let track = good_format.default_track(TrackType::Audio).unwrap().clone();
 
-        let mut decoder = symphonia::default::get_codecs()
-            .make_audio_decoder(
+            let decoder = symphonia::default::get_codecs().make_audio_decoder(
                 track.codec_params.as_ref().unwrap().audio().unwrap(),
                 &dec_opts,
-            )
-            .unwrap();
-        let track_id = track.id;
-        let mut samples: Vec<f32> = Default::default();
+            );
+            if decoder.is_err() {
+                return Err(E::new(
+                    ErrorKind::Other,
+                    format!("{}", decoder.err().unwrap()),
+                ));
+            } else {
+                let mut good_decoder = decoder.unwrap();
+                let track_id = track.id;
+                let mut samples: Vec<f32> = Default::default();
 
-        // #[cfg(debug_assertions)]
-        // {
-        //     println!(
-        //         "Starting audio sample parsing. This can take a fat minute in dev so be patient."
-        //     );
-        // }
-        while let Some(packet) = format.next_packet().unwrap() {
-            if packet.track_id != track_id {
-                continue;
-            }
+                while let Some(packet) = good_format.next_packet().unwrap() {
+                    if packet.track_id != track_id {
+                        continue;
+                    }
 
-            match decoder.decode(&packet) {
-                Ok(audio_buf) => {
-                    let mut t: Vec<f32> = Default::default();
-                    t.resize(audio_buf.samples_interleaved(), 0_f32);
-                    audio_buf.copy_to_slice_interleaved(&mut t);
-                    samples.append(&mut t);
+                    match good_decoder.decode(&packet) {
+                        Ok(audio_buf) => {
+                            let mut t: Vec<f32> = Default::default();
+                            t.resize(audio_buf.samples_interleaved(), 0_f32);
+                            audio_buf.copy_to_slice_interleaved(&mut t);
+                            samples.append(&mut t);
+                        }
+                        Err(Error::DecodeError(_)) => (),
+                        Err(_) => break,
+                    }
                 }
-                Err(Error::DecodeError(_)) => (),
-                Err(_) => break,
+
+                let binding = track.codec_params.unwrap();
+                let info = binding.audio().unwrap();
+                let sample_rate = info.sample_rate.unwrap();
+                let channels_count = info.channels.to_owned().unwrap().count();
+                ap = AudioPlayer::new(samples, sample_rate, channels_count, volume).unwrap();
             }
         }
-        // println!("{:?}", samples.len());
-
-        let binding = track.codec_params.unwrap();
-        let info = binding.audio().unwrap();
-        let sample_rate = info.sample_rate.unwrap();
-        let channels_count = info.channels.to_owned().unwrap().count();
-        // println!("{} channels; sample rate: {}", channels_count, sample_rate);
-        // println!("Starting Processing");
-        AudioPlayer::new(samples, sample_rate, channels_count, volume).unwrap()
+        Ok(ap)
     })
 }

@@ -1,4 +1,8 @@
-use std::{io, path::PathBuf, time::Duration};
+use std::{
+    io::{self, Error},
+    path::PathBuf,
+    time::Duration,
+};
 
 use crossterm::event::{Event::Key, KeyCode, KeyEvent, KeyEventKind, KeyEventState, KeyModifiers};
 use ratatui::{
@@ -13,7 +17,9 @@ use ratatui::{
 use ratatui_explorer::{FileExplorer, Theme};
 use sdl2::{AudioSubsystem, audio::AudioDevice};
 
-use crate::audio::{self, audio_player::AudioPlayer, player::create_device};
+use crate::audio::{
+    audio_player::AudioPlayer, player::create_device, player::process_samples_from_file,
+};
 
 #[derive(Default, PartialEq)]
 enum Page {
@@ -25,20 +31,22 @@ enum Page {
 #[derive(Default)]
 pub struct App {
     page: Page,
-    helper_thread_handle: Option<std::thread::JoinHandle<AudioPlayer>>,
-    audio_path: String,
+    comment_string: String,
+    helper_thread_handle: Option<std::thread::JoinHandle<Result<AudioPlayer, Error>>>,
+    audio_path: PathBuf,
     should_make_new_device: bool,
     current_device: Option<AudioDevice<AudioPlayer>>,
     audio_created: bool,
     exit: bool,
     explorer_state: Option<FileExplorer>,
-    explorer_focused: bool,
+    explorer_open: bool,
+    playback_ratio: Option<f64>,
 }
 
 impl App {
     pub fn new() -> Self {
         Self {
-            explorer_focused: true,
+            explorer_open: true,
             ..Default::default()
         }
     }
@@ -78,21 +86,41 @@ impl App {
     }
 
     fn handle_events(&mut self, audio_subsystem: &AudioSubsystem) -> io::Result<()> {
-        if !self.audio_created && self.should_make_new_device {
+        if self.should_make_new_device {
             if self.helper_thread_handle.is_none() {
-                self.helper_thread_handle = Some(audio::player::process_samples_from_file(
-                    self.audio_path.clone(),
+                self.helper_thread_handle = Some(process_samples_from_file(
+                    self.audio_path.clone().to_str().unwrap().to_owned(),
                     1_f32,
                 ));
             } else {
                 if self.helper_thread_handle.as_ref().unwrap().is_finished() {
                     let d = self.helper_thread_handle.take().unwrap().join().unwrap();
-                    self.current_device = Some(create_device(d, audio_subsystem.clone()).1);
-                    self.current_device.as_mut().unwrap().resume();
-                    self.audio_created = true;
+                    if d.is_err() {
+                        self.comment_string = format!(
+                            "Error on file {}: {}",
+                            self.audio_path.to_str().unwrap(),
+                            d.unwrap_err()
+                        )
+                        .to_string()
+                    } else {
+                        self.comment_string = self
+                            .audio_path
+                            .file_name()
+                            .unwrap()
+                            .to_str()
+                            .unwrap()
+                            .to_owned();
+                        self.current_device =
+                            Some(create_device(d.unwrap(), audio_subsystem.clone()).1);
+                        self.current_device.as_mut().unwrap().resume();
+                        self.audio_created = true;
+                    }
                     self.should_make_new_device = false;
                 }
             }
+        }
+        if self.audio_created {
+            self.playback_ratio = Some(self.current_device.as_mut().unwrap().lock().get_progress());
         }
         if crossterm::event::poll(Duration::from_millis(50))? {
             let event = crossterm::event::read()?;
@@ -128,18 +156,28 @@ impl App {
                             state: KeyEventState::NONE,
                         })
                     {
-                        self.explorer_focused = !self.explorer_focused;
+                        self.explorer_open = !self.explorer_open;
                     }
-                    if self.explorer_focused && event == Key(KeyEvent {
-                        code: KeyCode::Enter,
-                        modifiers: KeyModifiers::NONE,
-                        kind: KeyEventKind::Press,
-                        state: KeyEventState::NONE,
-                    }) {
-                        self.audio_path = self.explorer_state.as_mut().unwrap().current().path.clone().to_str().unwrap().to_owned();
+                    if self.explorer_open
+                        && event
+                            == Key(KeyEvent {
+                                code: KeyCode::Enter,
+                                modifiers: KeyModifiers::NONE,
+                                kind: KeyEventKind::Press,
+                                state: KeyEventState::NONE,
+                            })
+                        && self.explorer_state.as_ref().unwrap().current().is_file()
+                    {
+                        self.audio_path = self
+                            .explorer_state
+                            .as_ref()
+                            .unwrap()
+                            .current()
+                            .path
+                            .to_owned();
                         self.should_make_new_device = true;
                     }
-                    if self.explorer_focused {
+                    if self.explorer_open {
                         self.explorer_state.as_mut().unwrap().handle(&event)?;
                     }
                     if event
@@ -169,33 +207,50 @@ impl Widget for &App {
                     .title_bottom(Line::from(Line::from(vec![
                         " Quit ".into(),
                         "<CTRL + Q>".green().bold(),
-                        " About ".into(),
+                        "; About ".into(),
                         "<CTRL + A>".green().bold(),
-                        " Toggle Explorer Focus ".into(),
+                        "; Toggle Explorer Open ".into(),
                         "<TAB> ".green().bold(),
                     ])))
                     .title(Line::from(" GLAP | Player ").left_aligned());
                 let inner_area = block.inner(area);
-                let layout = Layout::default()
-                    .direction(Direction::Horizontal)
-                    .constraints([
-                        Constraint::Ratio(1, 4),
-                        Constraint::Length(1),
-                        Constraint::Fill(1),
-                    ])
-                    .split(inner_area);
-                let left = layout[0];
-                let right = layout[2];
+                let playback_area;
+                if self.explorer_open {
+                    let layout = Layout::default()
+                        .direction(Direction::Horizontal)
+                        .constraints([
+                            Constraint::Ratio(1, 4),
+                            Constraint::Length(1),
+                            Constraint::Fill(1),
+                        ])
+                        .split(inner_area);
+                    let left = layout[0];
+                    playback_area = Layout::default()
+                        .direction(Direction::Vertical)
+                        .constraints([Constraint::Percentage(50), Constraint::Fill(1)])
+                        .split(layout[2]);
+                    let explorer = self.explorer_state.as_ref().unwrap().widget();
+                    explorer.render_ref(left, buf);
+                } else {
+                    playback_area = Layout::default()
+                        .direction(Direction::Vertical)
+                        .constraints([Constraint::Percentage(50), Constraint::Fill(1)])
+                        .split(block.inner(area));
+                }
                 block.render(area, buf);
-                let explorer = self.explorer_state.as_ref().unwrap().widget();
-                explorer.render_ref(left, buf);
-                let progress_bar = LineGauge::default()
+                let mut progress_bar = LineGauge::default()
                     .filled_style(Style::new().red().bold())
                     .label("Played")
-                    .ratio(0_f64)
                     .filled_symbol(symbols::line::THICK_HORIZONTAL)
                     .unfilled_symbol(symbols::line::THICK_HORIZONTAL);
-                progress_bar.render(right, buf);
+                if self.audio_created && self.playback_ratio.is_some() {
+                    progress_bar = progress_bar.ratio(self.playback_ratio.unwrap());
+                } else {
+                    progress_bar = progress_bar.ratio(0_f64);
+                }
+                let title = Paragraph::new(self.comment_string.clone());
+                title.render(playback_area[0], buf);
+                progress_bar.render(playback_area[1], buf);
             }
 
             Page::About => {
@@ -203,7 +258,7 @@ impl Widget for &App {
                     .title_bottom(Line::from(Line::from(vec![
                         " Quit ".into(),
                         "<CTRL + Q>".green().bold(),
-                        " Player ".into(),
+                        "; Player ".into(),
                         "<CTRL + P> ".green().bold(),
                     ])))
                     .title(Line::from(" GLAP | About ").left_aligned());

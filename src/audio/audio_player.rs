@@ -14,9 +14,22 @@ pub struct AudioPlayer {
     pub sample_rate: u32,
     pub volume: f32,
     pub channels: usize,
-    pub play: bool,
     pub finished: bool,
     whar_am_i: usize,
+}
+
+// Basically for if an error occurs that makes it to where the contents of AudioPlayer
+// are displayed it doesn't dump the entire contents of the samples vec to wherever.
+impl std::fmt::Debug for AudioPlayer {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("AudioPlayer")
+            .field("sample_rate", &self.sample_rate)
+            .field("volume", &self.volume)
+            .field("channels", &self.channels)
+            .field("finished", &self.finished)
+            .field("whar_am_i", &self.whar_am_i)
+            .finish()
+    }
 }
 
 impl AudioPlayer {
@@ -34,14 +47,16 @@ impl AudioPlayer {
             sample_rate,
             volume,
             channels,
-            play: true,
             finished: false,
             whar_am_i: 0,
         })
     }
 
-    pub fn get_progress(self) -> f64 {
-        return self.whar_am_i as f64 / self.samples.len() as f64;
+    pub fn get_progress(&self) -> f64 {
+        if self.finished {
+            return 1_f64;
+        }
+        self.whar_am_i as f64 / self.samples.len() as f64
     }
 }
 
@@ -50,7 +65,7 @@ impl AudioCallback for AudioPlayer {
 
     fn callback(&mut self, out: &mut [f32]) {
         let d = self.samples.len();
-        if self.finished || !self.play {
+        if self.finished {
             for x in out.iter_mut() {
                 *x = 0_f32
             }
