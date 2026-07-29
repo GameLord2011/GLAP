@@ -2,6 +2,7 @@ use std::{
     default::Default,
     fs::File,
     io::{Error as E, ErrorKind},
+    thread::{JoinHandle, spawn},
 };
 
 use sdl2::{
@@ -9,12 +10,15 @@ use sdl2::{
     audio::{AudioDevice, AudioSpecDesired},
 };
 
-use symphonia::core::{
-    codecs::audio::AudioDecoderOptions,
-    errors::Error,
-    formats::{FormatOptions, TrackType, probe::Hint},
-    io::MediaSourceStream,
-    meta::MetadataOptions,
+use symphonia::{
+    core::{
+        codecs::audio::AudioDecoderOptions,
+        errors::Error,
+        formats::{FormatOptions, TrackType, probe::Hint},
+        io::MediaSourceStream,
+        meta::MetadataOptions,
+    },
+    default::{get_codecs, get_probe},
 };
 
 use crate::audio::audio_player::AudioPlayer;
@@ -37,11 +41,8 @@ pub fn create_device(
     (secs, device)
 }
 
-pub fn process_samples_from_file(
-    path: String,
-    volume: f32,
-) -> std::thread::JoinHandle<Result<AudioPlayer, E>> {
-    std::thread::spawn(move || {
+pub fn process_samples_from_file(path: String, volume: f32) -> JoinHandle<Result<AudioPlayer, E>> {
+    spawn(move || {
         let ap: AudioPlayer;
         let file = Box::new(File::open(path).unwrap());
         let mss = MediaSourceStream::new(file, Default::default());
@@ -52,7 +53,7 @@ pub fn process_samples_from_file(
         let meta_opts: MetadataOptions = Default::default();
         let dec_opts: AudioDecoderOptions = Default::default();
 
-        let format = symphonia::default::get_probe().probe(&hint, mss, fmt_opts, meta_opts);
+        let format = get_probe().probe(&hint, mss, fmt_opts, meta_opts);
 
         if format.is_err() {
             return Err(E::new(
@@ -63,10 +64,11 @@ pub fn process_samples_from_file(
             let mut good_format = format.unwrap();
             let track = good_format.default_track(TrackType::Audio).unwrap().clone();
 
-            let decoder = symphonia::default::get_codecs().make_audio_decoder(
+            let decoder = get_codecs().make_audio_decoder(
                 track.codec_params.as_ref().unwrap().audio().unwrap(),
                 &dec_opts,
             );
+
             if decoder.is_err() {
                 return Err(E::new(
                     ErrorKind::Other,

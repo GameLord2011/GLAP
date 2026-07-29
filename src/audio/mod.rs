@@ -1,2 +1,2 @@
 pub mod audio_player;
-pub mod player;
+pub mod processing;

@@ -1,5 +1,6 @@
 use color_eyre::eyre::eyre;
 use sdl2::audio::AudioCallback;
+use std::fmt::{Debug, Result as R};
 
 /**
     An Audio Player for use with SDL2.
@@ -20,8 +21,8 @@ pub struct AudioPlayer {
 
 // Basically for if an error occurs that makes it to where the contents of AudioPlayer
 // are displayed it doesn't dump the entire contents of the samples vec to wherever.
-impl std::fmt::Debug for AudioPlayer {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl Debug for AudioPlayer {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> R {
         f.debug_struct("AudioPlayer")
             .field("sample_rate", &self.sample_rate)
             .field("volume", &self.volume)
@@ -57,6 +58,11 @@ impl AudioPlayer {
             return 1_f64;
         }
         self.whar_am_i as f64 / self.samples.len() as f64
+    }
+
+    pub fn restart(&mut self) {
+        self.whar_am_i = 0;
+        self.finished = false;
     }
 }
 
