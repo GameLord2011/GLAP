@@ -17,11 +17,10 @@ use ratatui::{
 use ratatui_explorer::{FileExplorer, Theme};
 use sdl2::{AudioSubsystem, audio::AudioDevice};
 
-use crate::
-    audio::{
-        audio_player::AudioPlayer,
-        processing::{create_device, process_samples_from_file},
-    };
+use crate::audio::{
+    audio_player::AudioPlayer,
+    processing::{create_device, process_samples_from_file},
+};
 
 #[derive(Default, PartialEq)]
 enum RepeatState {
@@ -65,6 +64,8 @@ pub struct App {
     focused: Focused,
     playing: bool,
     repeat_sate: RepeatState,
+    queue: Vec<PathBuf>,
+    que_idx: usize,
 }
 
 impl App {
@@ -151,7 +152,17 @@ impl App {
             if self.current_device.as_mut().unwrap().lock().finished {
                 match self.repeat_sate {
                     RepeatState::None => self.current_device.as_mut().unwrap().pause(),
-                    RepeatState::RepeatAll => (),
+                    RepeatState::RepeatAll => {
+                        if self.que_idx == self.queue.len() {
+                            self.que_idx = 0;
+                            self.audio_path = self.queue[0].clone();
+                        } else {
+                            self.audio_path = self.queue[self.que_idx].clone();
+                        }
+                        self.que_idx += 1;
+                        self.should_make_new_device = true;
+                        self.audio_created = false;
+                    },
                     RepeatState::RepeatOne => {
                         self.current_device.as_mut().unwrap().lock().restart()
                     }
@@ -187,48 +198,91 @@ impl App {
                 }
 
                 Page::Player => {
-                    if event
-                        == Key(KeyEvent {
+                    match event {
+                        Key(KeyEvent {
                             code: KeyCode::Char(' '),
                             modifiers: KeyModifiers::NONE,
                             kind: KeyEventKind::Press,
                             state: KeyEventState::NONE,
-                        })
-                        && self.audio_created
-                    {
-                        if self.playing {
-                            self.current_device.as_mut().unwrap().pause();
-                            self.playing = false;
-                        } else {
-                            self.current_device.as_mut().unwrap().resume();
-                            self.playing = true;
+                        }) => {
+                            if self.audio_created {
+                                if self.playing {
+                                    self.current_device.as_mut().unwrap().pause();
+                                    self.playing = false;
+                                } else {
+                                    self.current_device.as_mut().unwrap().resume();
+                                    self.playing = true;
+                                }
+                            }
                         }
-                    }
 
-                    if event
-                        == Key(KeyEvent {
+                        Key(KeyEvent {
                             code: KeyCode::Tab,
                             modifiers: KeyModifiers::NONE,
                             kind: KeyEventKind::Press,
                             state: KeyEventState::NONE,
-                        })
-                    {
-                        if self.focused == Focused::Explorer {
-                            self.focused = Focused::None
-                        } else {
-                            self.focused = Focused::Explorer
+                        }) => {
+                            if self.focused == Focused::Explorer {
+                                self.focused = Focused::None
+                            } else {
+                                self.focused = Focused::Explorer
+                            }
                         }
-                    }
 
-                    if event
-                        == Key(KeyEvent {
+                        Key(KeyEvent {
+                            code: KeyCode::Up,
+                            modifiers: KeyModifiers::NONE,
+                            kind: KeyEventKind::Press,
+                            state: KeyEventState::NONE,
+                        }) => match self.focused {
+                            Focused::Playbar => (),
+                            Focused::Explorer => (),
+                            _ => self.focused = Focused::Playbar,
+                        },
+
+                        Key(KeyEvent {
+                            code: KeyCode::Down,
+                            modifiers: KeyModifiers::NONE,
+                            kind: KeyEventKind::Press,
+                            state: KeyEventState::NONE,
+                        }) => match self.focused {
+                            Focused::Playbar => self.focused = Focused::Play,
+                            Focused::Explorer => (),
+                            _ => (),
+                        },
+
+                        Key(KeyEvent {
+                            code: KeyCode::Left,
+                            modifiers: KeyModifiers::NONE,
+                            kind: KeyEventKind::Press,
+                            state: KeyEventState::NONE,
+                        }) => match self.focused {
+                            Focused::Play => self.focused = Focused::Back,
+                            Focused::Forward => self.focused = Focused::Play,
+                            Focused::Repeat => self.focused = Focused::Forward,
+                            Focused::None => self.focused = Focused::Back,
+                            _ => (),
+                        },
+
+                        Key(KeyEvent {
+                            code: KeyCode::Right,
+                            modifiers: KeyModifiers::NONE,
+                            kind: KeyEventKind::Press,
+                            state: KeyEventState::NONE,
+                        }) => match self.focused {
+                            Focused::Back => self.focused = Focused::Play,
+                            Focused::Play => self.focused = Focused::Forward,
+                            Focused::Forward => self.focused = Focused::Repeat,
+                            Focused::None => self.focused = Focused::Forward,
+                            _ => (),
+                        },
+
+                        Key(KeyEvent {
                             code: KeyCode::Enter,
                             modifiers: KeyModifiers::NONE,
                             kind: KeyEventKind::Press,
                             state: KeyEventState::NONE,
-                        })
-                    {
-                        match self.focused {
+                        }) => match self.focused {
                             Focused::Explorer => {
                                 if self.explorer_state.as_ref().unwrap().current().is_file() {
                                     self.audio_path = self
@@ -241,63 +295,68 @@ impl App {
                                     self.should_make_new_device = true;
                                 }
                             }
-                            Focused::Play => {
-                                if self.playing {
-                                    self.current_device.as_mut().unwrap().pause();
-                                } else {
-                                    self.current_device.as_mut().unwrap().resume();
-                                }
-                            },
-                            Focused::Back => self.current_device.as_mut().unwrap().lock().restart(),
-                            Focused::Forward => {
-                                match self.repeat_sate {
-                                    RepeatState::RepeatOne => self.current_device.as_mut().unwrap().lock().restart(),
-                                    RepeatState::RepeatAll => (),
-                                    _ => ()
-                                }
-                            },
-                            Focused::Repeat => {
-                                match self.repeat_sate {
-                                    RepeatState::None => self.repeat_sate = RepeatState::RepeatAll,
-                                    RepeatState::RepeatAll => self.repeat_sate = RepeatState::RepeatOne,
-                                    RepeatState::RepeatOne => self.repeat_sate = RepeatState::None,
-                                }
-                            },
-                            _ => (),
-                        }
-                    }
 
-                    if self.focused == Focused::Explorer
-                        && event
-                            == Key(KeyEvent {
-                                code: KeyCode::Enter,
-                                modifiers: KeyModifiers::NONE,
-                                kind: KeyEventKind::Press,
-                                state: KeyEventState::NONE,
-                            })
-                        && self.explorer_state.as_ref().unwrap().current().is_file()
-                    {
-                        self.audio_path = self
-                            .explorer_state
-                            .as_ref()
-                            .unwrap()
-                            .current()
-                            .path
-                            .to_owned();
-                        self.should_make_new_device = true;
-                    }
-                    if self.focused == Focused::Explorer {
-                        self.explorer_state.as_mut().unwrap().handle(&event)?;
-                    }
-                    if event
-                        == Key(KeyEvent {
+                            Focused::Play => {
+                                if self.audio_created {
+                                    if self.playing {
+                                        self.current_device.as_mut().unwrap().pause();
+                                        self.playing = false;
+                                    } else {
+                                        self.current_device.as_mut().unwrap().resume();
+                                        self.playing = true;
+                                    }
+                                }
+                            }
+
+                            Focused::Back => self.current_device.as_mut().unwrap().lock().restart(),
+
+                            Focused::Forward => match self.repeat_sate {
+                                RepeatState::None => (),
+                                RepeatState::RepeatOne => {
+                                    self.current_device.as_mut().unwrap().lock().restart();
+                                }
+                                RepeatState::RepeatAll => {
+                                    self.current_device.as_mut().unwrap().lock().finished = true;
+                                },
+                            },
+
+                            Focused::Repeat => match self.repeat_sate {
+                                RepeatState::None => {
+                                    self.repeat_sate = RepeatState::RepeatAll;
+                                    self.queue = self.explorer_state
+                                        .as_ref()
+                                        .unwrap()
+                                        .files()
+                                        .iter()
+                                        .map(|f| f.path.clone())
+                                        .collect();
+                                    self.queue.remove(0); // On most systems this is the ../ directory.
+                                    let idx = self.queue.iter().position(|n| n == &self.audio_path);
+                                    if idx.is_some() {
+                                        self.queue.rotate_left(idx.unwrap() + 1);
+                                    }
+                                    self.que_idx = 0;
+                                    // self.should_make_new_device = true;
+                                },
+                                RepeatState::RepeatAll => self.repeat_sate = RepeatState::RepeatOne,
+                                RepeatState::RepeatOne => self.repeat_sate = RepeatState::None,
+                            },
+
+                            _ => (),
+                        },
+
+                        Key(KeyEvent {
                             code: KeyCode::Char('a'),
                             modifiers: KeyModifiers::CONTROL,
                             kind: KeyEventKind::Press,
                             state: KeyEventState::NONE,
-                        })
-                    {
-                        self.page = Page::About
+                        }) => self.page = Page::About,
+
+                        _ => (),
+                    }
+
+                    if self.focused == Focused::Explorer {
+                        self.explorer_state.as_mut().unwrap().handle(&event)?;
                     }
                 }
             }
@@ -374,8 +433,14 @@ impl Widget for &App {
                     play_text = "\u{F040A}";
                 }
 
+                let repeat_text = match self.repeat_sate {
+                    RepeatState::None => "\u{F0457}",
+                    RepeatState::RepeatAll => "\u{F0456}",
+                    RepeatState::RepeatOne => "\u{F0458}"
+                };
+
                 let mut play_button = Paragraph::new(play_text);
-                let mut repeat = Paragraph::new("\u{F0457}");
+                let mut repeat = Paragraph::new(repeat_text);
                 let mut back = Paragraph::new("\u{F04AB}");
                 let mut forward = Paragraph::new("\u{F04AC}");
 
