@@ -1,7 +1,7 @@
 use std::{
     default::Default,
     fs::File,
-    io::{Error as E, ErrorKind},
+    io::{Error as E},
     thread::{JoinHandle, spawn},
 };
 
