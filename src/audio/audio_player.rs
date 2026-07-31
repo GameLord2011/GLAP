@@ -1,6 +1,5 @@
-use color_eyre::eyre::eyre;
 use sdl2::audio::AudioCallback;
-use std::fmt::{Debug, Result as R};
+use std::fmt::{Debug, Result};
 
 /**
     An Audio Player for use with SDL2.
@@ -13,7 +12,6 @@ use std::fmt::{Debug, Result as R};
 pub struct AudioPlayer {
     pub samples: Vec<f32>,
     pub sample_rate: u32,
-    pub volume: f32,
     pub channels: usize,
     pub finished: bool,
     whar_am_i: usize,
@@ -22,10 +20,9 @@ pub struct AudioPlayer {
 // Basically for if an error occurs that makes it to where the contents of AudioPlayer
 // are displayed it doesn't dump the entire contents of the samples vec to wherever.
 impl Debug for AudioPlayer {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> R {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<> {
         f.debug_struct("AudioPlayer")
             .field("sample_rate", &self.sample_rate)
-            .field("volume", &self.volume)
             .field("channels", &self.channels)
             .field("finished", &self.finished)
             .field("whar_am_i", &self.whar_am_i)
@@ -38,19 +35,14 @@ impl AudioPlayer {
         samples: Vec<f32>,
         sample_rate: u32,
         channels: usize,
-        volume: f32,
-    ) -> Result<Self, color_eyre::eyre::Error> {
-        if volume > 1_f32 {
-            Err::<Self, color_eyre::eyre::ErrReport>(eyre!("Volume cannot be greater than 1"))?;
-        }
-        Ok(Self {
+    ) -> Self {
+        Self {
             samples,
             sample_rate,
-            volume,
             channels,
             finished: false,
             whar_am_i: 0,
-        })
+        }
     }
 
     pub fn get_progress(&self) -> f64 {
@@ -70,29 +62,33 @@ impl AudioCallback for AudioPlayer {
     type Channel = f32;
 
     fn callback(&mut self, out: &mut [f32]) {
-        let d = self.samples.len();
-        if self.finished {
+        let samples_len = self.samples.len();
+        if self.finished { // Basically a fallback thing for a likely non-existent edge-case.
             for x in out.iter_mut() {
                 *x = 0_f32
             }
         } else {
             let l = out.len();
             let next = self.whar_am_i + l;
-            if next > d {
-                let can_copy = d - self.whar_am_i;
+
+            if next > samples_len {
+                // What it can copy.
+                let can_copy = samples_len - self.whar_am_i;
+
+                // Copies the rest of the existing buffer.
                 out[..can_copy].copy_from_slice(&self.samples[self.whar_am_i..]);
-                for i in out[can_copy..].iter_mut() {
-                    *i = 0_f32
+
+                // Zeroes out the rest.
+                for x in out[can_copy..].iter_mut() {
+                    *x = 0_f32
                 }
+
+                // Sets that the song is done.
                 self.finished = true;
             } else {
+                // Normal Operation.
                 out.copy_from_slice(&self.samples[self.whar_am_i..self.whar_am_i + l]);
                 self.whar_am_i += l;
-            }
-            if self.volume != 1_f32 {
-                for x in out.iter_mut() {
-                    *x = *x * self.volume;
-                }
             }
         }
     }

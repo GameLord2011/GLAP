@@ -2,6 +2,7 @@ use std::{
     io::{self, Error},
     path::PathBuf,
     time::Duration,
+    thread::JoinHandle
 };
 
 use crossterm::event::{Event::Key, KeyCode, KeyEvent, KeyEventKind, KeyEventState, KeyModifiers};
@@ -53,7 +54,7 @@ enum Page {
 pub struct App {
     page: Page,
     comment_string: String,
-    helper_thread_handle: Option<std::thread::JoinHandle<Result<AudioPlayer, Error>>>,
+    helper_thread_handle: Option<JoinHandle<Result<AudioPlayer, Error>>>,
     audio_path: PathBuf,
     should_make_new_device: bool,
     current_device: Option<AudioDevice<AudioPlayer>>,
@@ -84,11 +85,11 @@ impl App {
             ),
         );
         let audio_dir = dirs::audio_dir();
-        if audio_dir.is_some() {
+        if let Some(d) = audio_dir {
             self.explorer_state
                 .as_mut()
                 .unwrap()
-                .set_cwd(audio_dir.unwrap())?;
+                .set_cwd(d)?;
         }
 
         loop {
@@ -114,17 +115,16 @@ impl App {
                     self.comment_string = "Parsing audio samples; this may take a while in a development environment.".to_owned();
                 }
                 self.helper_thread_handle = Some(process_samples_from_file(
-                    self.audio_path.clone().to_str().unwrap().to_owned(),
-                    1_f32,
+                    self.audio_path.clone().to_str().unwrap().to_owned()
                 ));
             } else {
                 if self.helper_thread_handle.as_ref().unwrap().is_finished() {
                     let d = self.helper_thread_handle.take().unwrap().join().unwrap();
-                    if d.is_err() {
+                    if let Err(e) = d {
                         self.comment_string = format!(
                             "Error on file {}: {}",
                             self.audio_path.to_str().unwrap(),
-                            d.unwrap_err()
+                            e
                         )
                         .to_string()
                     } else {
@@ -425,22 +425,19 @@ impl Widget for &App {
 
                 block.render(area, buf);
 
-                let play_text;
-
-                if self.playing {
-                    play_text = "\u{F03E4}";
-                } else {
-                    play_text = "\u{F040A}";
-                }
-
-                let repeat_text = match self.repeat_sate {
-                    RepeatState::None => "\u{F0457}",
-                    RepeatState::RepeatAll => "\u{F0456}",
-                    RepeatState::RepeatOne => "\u{F0458}"
-                };
-
-                let mut play_button = Paragraph::new(play_text);
-                let mut repeat = Paragraph::new(repeat_text);
+                let mut play_button = Paragraph::new(
+                    match self.playing {
+                        true => "\u{F03E4}",
+                        false => "\u{F040A}"
+                    }
+                );
+                let mut repeat = Paragraph::new(
+                    match self.repeat_sate {
+                        RepeatState::None => "\u{F0457}",
+                        RepeatState::RepeatAll => "\u{F0456}",
+                        RepeatState::RepeatOne => "\u{F0458}"
+                    }
+                );
                 let mut back = Paragraph::new("\u{F04AB}");
                 let mut forward = Paragraph::new("\u{F04AC}");
 

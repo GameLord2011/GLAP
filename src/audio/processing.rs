@@ -41,7 +41,7 @@ pub fn create_device(
     (secs, device)
 }
 
-pub fn process_samples_from_file(path: String, volume: f32) -> JoinHandle<Result<AudioPlayer, E>> {
+pub fn process_samples_from_file(path: String) -> JoinHandle<Result<AudioPlayer, E>> {
     spawn(move || {
         let ap: AudioPlayer;
         let file = Box::new(File::open(path).unwrap());
@@ -100,7 +100,7 @@ pub fn process_samples_from_file(path: String, volume: f32) -> JoinHandle<Result
                 let info = binding.audio().unwrap();
                 let sample_rate = info.sample_rate.unwrap();
                 let channels_count = info.channels.to_owned().unwrap().count();
-                ap = AudioPlayer::new(samples, sample_rate, channels_count, volume).unwrap();
+                ap = AudioPlayer::new(samples, sample_rate, channels_count);
             }
         }
         Ok(ap)
