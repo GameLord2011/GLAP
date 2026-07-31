@@ -20,7 +20,7 @@ pub struct AudioPlayer {
 // Basically for if an error occurs that makes it to where the contents of AudioPlayer
 // are displayed it doesn't dump the entire contents of the samples vec to wherever.
 impl Debug for AudioPlayer {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result {
         f.debug_struct("AudioPlayer")
             .field("sample_rate", &self.sample_rate)
             .field("channels", &self.channels)
@@ -31,11 +31,7 @@ impl Debug for AudioPlayer {
 }
 
 impl AudioPlayer {
-    pub fn new(
-        samples: Vec<f32>,
-        sample_rate: u32,
-        channels: usize,
-    ) -> Self {
+    pub fn new(samples: Vec<f32>, sample_rate: u32, channels: usize) -> Self {
         Self {
             samples,
             sample_rate,
@@ -63,7 +59,8 @@ impl AudioCallback for AudioPlayer {
 
     fn callback(&mut self, out: &mut [f32]) {
         let samples_len = self.samples.len();
-        if self.finished { // Basically a fallback thing for a likely non-existent edge-case.
+        if self.finished {
+            // Basically a fallback thing for a likely non-existent edge-case.
             for x in out.iter_mut() {
                 *x = 0_f32
             }

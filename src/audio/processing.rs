@@ -56,9 +56,7 @@ pub fn process_samples_from_file(path: String) -> JoinHandle<Result<AudioPlayer,
         let format = get_probe().probe(&hint, mss, fmt_opts, meta_opts);
 
         if format.is_err() {
-            return Err(E::other(
-                format!("{}", format.err().unwrap()),
-            ));
+            return Err(E::other(format!("{}", format.err().unwrap())));
         } else {
             let mut good_format = format.unwrap();
             let track = good_format.default_track(TrackType::Audio).unwrap().clone();
@@ -69,9 +67,7 @@ pub fn process_samples_from_file(path: String) -> JoinHandle<Result<AudioPlayer,
             );
 
             if decoder.is_err() {
-                return Err(E::other(
-                    format!("{}", decoder.err().unwrap()),
-                ));
+                return Err(E::other(format!("{}", decoder.err().unwrap())));
             } else {
                 let mut good_decoder = decoder.unwrap();
                 let track_id = track.id;

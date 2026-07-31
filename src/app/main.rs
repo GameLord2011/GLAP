@@ -1,8 +1,8 @@
 use std::{
     io::{self, Error},
     path::PathBuf,
+    thread::JoinHandle,
     time::Duration,
-    thread::JoinHandle
 };
 
 use crossterm::event::{Event::Key, KeyCode, KeyEvent, KeyEventKind, KeyEventState, KeyModifiers};
@@ -86,10 +86,7 @@ impl App {
         );
         let audio_dir = dirs::audio_dir();
         if let Some(d) = audio_dir {
-            self.explorer_state
-                .as_mut()
-                .unwrap()
-                .set_cwd(d)?;
+            self.explorer_state.as_mut().unwrap().set_cwd(d)?;
         }
 
         loop {
@@ -115,18 +112,15 @@ impl App {
                     self.comment_string = "Parsing audio samples; this may take a while in a development environment.".to_owned();
                 }
                 self.helper_thread_handle = Some(process_samples_from_file(
-                    self.audio_path.clone().to_str().unwrap().to_owned()
+                    self.audio_path.clone().to_str().unwrap().to_owned(),
                 ));
             } else {
                 if self.helper_thread_handle.as_ref().unwrap().is_finished() {
                     let d = self.helper_thread_handle.take().unwrap().join().unwrap();
                     if let Err(e) = d {
-                        self.comment_string = format!(
-                            "Error on file {}: {}",
-                            self.audio_path.to_str().unwrap(),
-                            e
-                        )
-                        .to_string()
+                        self.comment_string =
+                            format!("Error on file {}: {}", self.audio_path.to_str().unwrap(), e)
+                                .to_string()
                     } else {
                         self.comment_string = self
                             .audio_path
@@ -162,7 +156,7 @@ impl App {
                         self.que_idx += 1;
                         self.should_make_new_device = true;
                         self.audio_created = false;
-                    },
+                    }
                     RepeatState::RepeatOne => {
                         self.current_device.as_mut().unwrap().lock().restart()
                     }
@@ -317,13 +311,14 @@ impl App {
                                 }
                                 RepeatState::RepeatAll => {
                                     self.current_device.as_mut().unwrap().lock().finished = true;
-                                },
+                                }
                             },
 
                             Focused::Repeat => match self.repeat_sate {
                                 RepeatState::None => {
                                     self.repeat_sate = RepeatState::RepeatAll;
-                                    self.queue = self.explorer_state
+                                    self.queue = self
+                                        .explorer_state
                                         .as_ref()
                                         .unwrap()
                                         .files()
@@ -337,7 +332,7 @@ impl App {
                                     }
                                     self.que_idx = 0;
                                     // self.should_make_new_device = true;
-                                },
+                                }
                                 RepeatState::RepeatAll => self.repeat_sate = RepeatState::RepeatOne,
                                 RepeatState::RepeatOne => self.repeat_sate = RepeatState::None,
                             },
@@ -425,19 +420,15 @@ impl Widget for &App {
 
                 block.render(area, buf);
 
-                let mut play_button = Paragraph::new(
-                    match self.playing {
-                        true => "\u{F03E4}",
-                        false => "\u{F040A}"
-                    }
-                );
-                let mut repeat = Paragraph::new(
-                    match self.repeat_sate {
-                        RepeatState::None => "\u{F0457}",
-                        RepeatState::RepeatAll => "\u{F0456}",
-                        RepeatState::RepeatOne => "\u{F0458}"
-                    }
-                );
+                let mut play_button = Paragraph::new(match self.playing {
+                    true => "\u{F03E4}",
+                    false => "\u{F040A}",
+                });
+                let mut repeat = Paragraph::new(match self.repeat_sate {
+                    RepeatState::None => "\u{F0457}",
+                    RepeatState::RepeatAll => "\u{F0456}",
+                    RepeatState::RepeatOne => "\u{F0458}",
+                });
                 let mut back = Paragraph::new("\u{F04AB}");
                 let mut forward = Paragraph::new("\u{F04AC}");
 

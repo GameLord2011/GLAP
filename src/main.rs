@@ -1,9 +1,9 @@
 extern crate sdl2;
 
-use color_eyre::{Result, install};
-use sdl2::init;
-use ratatui::run;
 use crate::app::main::App;
+use color_eyre::{Result, install};
+use ratatui::run;
+use sdl2::init;
 
 mod app;
 mod audio;
