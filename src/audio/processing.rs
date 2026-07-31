@@ -56,8 +56,7 @@ pub fn process_samples_from_file(path: String) -> JoinHandle<Result<AudioPlayer,
         let format = get_probe().probe(&hint, mss, fmt_opts, meta_opts);
 
         if format.is_err() {
-            return Err(E::new(
-                ErrorKind::Other,
+            return Err(E::other(
                 format!("{}", format.err().unwrap()),
             ));
         } else {
@@ -70,8 +69,7 @@ pub fn process_samples_from_file(path: String) -> JoinHandle<Result<AudioPlayer,
             );
 
             if decoder.is_err() {
-                return Err(E::new(
-                    ErrorKind::Other,
+                return Err(E::other(
                     format!("{}", decoder.err().unwrap()),
                 ));
             } else {

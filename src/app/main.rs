@@ -376,23 +376,23 @@ impl Widget for &App {
         match self.page {
             Page::Player => {
                 if self.focused == Focused::Explorer {
-                    block = block.title_bottom(Line::from(Line::from(vec![
+                    block = block.title_bottom(Line::from(vec![
                         " Quit ".into(),
                         "<CTRL + Q>".green().bold(),
                         "; About ".into(),
                         "<CTRL + A>".green().bold(),
                         "; Close Explorer ".into(),
                         "<TAB> ".green().bold(),
-                    ])));
+                    ]));
                 } else {
-                    block = block.title_bottom(Line::from(Line::from(vec![
+                    block = block.title_bottom(Line::from(vec![
                         " Quit ".into(),
                         "<CTRL + Q>".green().bold(),
                         "; About ".into(),
                         "<CTRL + A>".green().bold(),
                         "; Open Explorer ".into(),
                         "<TAB> ".green().bold(),
-                    ])));
+                    ]));
                 }
                 block = block.title(Line::from(" GLAP | Player ").left_aligned());
 
@@ -507,12 +507,12 @@ impl Widget for &App {
 
             Page::About => {
                 block = block
-                    .title_bottom(Line::from(Line::from(vec![
+                    .title_bottom(Line::from(vec![
                         " Quit ".into(),
                         "<CTRL + Q>".green().bold(),
                         "; Player ".into(),
                         "<CTRL + P> ".green().bold(),
-                    ])))
+                    ]))
                     .title(Line::from(" GLAP | About ").left_aligned());
                 Paragraph::new(include_str!("about.txt"))
                     .left_aligned()
