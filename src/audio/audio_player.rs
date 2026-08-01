@@ -17,19 +17,6 @@ pub struct AudioPlayer {
     whar_am_i: usize,
 }
 
-// Basically for if an error occurs that makes it to where the contents of AudioPlayer
-// are displayed it doesn't dump the entire contents of the samples vec to wherever.
-impl Debug for AudioPlayer {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result {
-        f.debug_struct("AudioPlayer")
-            .field("sample_rate", &self.sample_rate)
-            .field("channels", &self.channels)
-            .field("finished", &self.finished)
-            .field("whar_am_i", &self.whar_am_i)
-            .finish()
-    }
-}
-
 impl AudioPlayer {
     pub fn new(samples: Vec<f32>, sample_rate: u32, channels: usize) -> Self {
         Self {
@@ -48,9 +35,40 @@ impl AudioPlayer {
         self.whar_am_i as f64 / self.samples.len() as f64
     }
 
+    pub fn forward_2s(&mut self) {
+        let forward = (self.sample_rate * 2) as usize;
+        if self.whar_am_i + forward > self.samples.len() {
+            self.finished = true;
+        } else {
+            self.whar_am_i += forward;
+        }
+    }
+
+    pub fn back_2s(&mut self) {
+        let backward = (self.sample_rate * 2) as usize;
+        if let Some(d) = self.whar_am_i.checked_sub(backward) {
+            self.whar_am_i = d;
+        } else {
+            self.whar_am_i = 0;
+        }
+    }
+
     pub fn restart(&mut self) {
         self.whar_am_i = 0;
         self.finished = false;
+    }
+}
+
+// Basically for if an error occurs that makes it to where the contents of AudioPlayer
+// are displayed it doesn't dump the entire contents of the samples vec to wherever.
+impl Debug for AudioPlayer {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result {
+        f.debug_struct("AudioPlayer")
+            .field("sample_rate", &self.sample_rate)
+            .field("channels", &self.channels)
+            .field("finished", &self.finished)
+            .field("whar_am_i", &self.whar_am_i)
+            .finish()
     }
 }
 
@@ -66,9 +84,8 @@ impl AudioCallback for AudioPlayer {
             }
         } else {
             let l = out.len();
-            let next = self.whar_am_i + l;
 
-            if next > samples_len {
+            if (self.whar_am_i + l) > samples_len {
                 // What it can copy.
                 let can_copy = samples_len - self.whar_am_i;
 

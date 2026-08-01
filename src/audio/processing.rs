@@ -43,17 +43,12 @@ pub fn create_device(
 
 pub fn process_samples_from_file(path: String) -> JoinHandle<Result<AudioPlayer, E>> {
     spawn(move || {
-        let ap: AudioPlayer;
         let file = Box::new(File::open(path).unwrap());
         let mss = MediaSourceStream::new(file, Default::default());
 
         let hint = Hint::new();
 
-        let fmt_opts: FormatOptions = Default::default();
-        let meta_opts: MetadataOptions = Default::default();
-        let dec_opts: AudioDecoderOptions = Default::default();
-
-        let format = get_probe().probe(&hint, mss, fmt_opts, meta_opts);
+        let format = get_probe().probe(&hint, mss, FormatOptions::default(), MetadataOptions::default());
 
         if format.is_err() {
             return Err(E::other(format!("{}", format.err().unwrap())));
@@ -63,18 +58,17 @@ pub fn process_samples_from_file(path: String) -> JoinHandle<Result<AudioPlayer,
 
             let decoder = get_codecs().make_audio_decoder(
                 track.codec_params.as_ref().unwrap().audio().unwrap(),
-                &dec_opts,
+                &AudioDecoderOptions::default(),
             );
 
             if decoder.is_err() {
                 return Err(E::other(format!("{}", decoder.err().unwrap())));
             } else {
                 let mut good_decoder = decoder.unwrap();
-                let track_id = track.id;
                 let mut samples: Vec<f32> = Default::default();
 
                 while let Some(packet) = good_format.next_packet().unwrap() {
-                    if packet.track_id != track_id {
+                    if packet.track_id != track.id {
                         continue;
                     }
 
@@ -92,11 +86,14 @@ pub fn process_samples_from_file(path: String) -> JoinHandle<Result<AudioPlayer,
 
                 let binding = track.codec_params.unwrap();
                 let info = binding.audio().unwrap();
-                let sample_rate = info.sample_rate.unwrap();
-                let channels_count = info.channels.to_owned().unwrap().count();
-                ap = AudioPlayer::new(samples, sample_rate, channels_count);
+                Ok(
+                    AudioPlayer::new(
+                        samples,
+                        info.sample_rate.unwrap(),
+                        info.channels.to_owned().unwrap().count()
+                    )
+                )
             }
         }
-        Ok(ap)
     })
 }

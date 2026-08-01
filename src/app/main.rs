@@ -5,7 +5,7 @@ use std::{
     time::Duration,
 };
 
-use crossterm::event::{Event::Key, KeyCode, KeyEvent, KeyEventKind, KeyEventState, KeyModifiers};
+use crossterm::event::{Event::{FocusLost, Key}, KeyCode, KeyEvent, KeyEventKind, KeyEventState, KeyModifiers};
 use ratatui::{
     DefaultTerminal, Frame,
     buffer::Buffer,
@@ -255,6 +255,9 @@ impl App {
                             Focused::Forward => self.focused = Focused::Play,
                             Focused::Repeat => self.focused = Focused::Forward,
                             Focused::None => self.focused = Focused::Back,
+                            Focused::Playbar => if self.audio_created {
+                                self.current_device.as_mut().unwrap().lock().back_2s()
+                            },
                             _ => (),
                         },
 
@@ -268,6 +271,9 @@ impl App {
                             Focused::Play => self.focused = Focused::Forward,
                             Focused::Forward => self.focused = Focused::Repeat,
                             Focused::None => self.focused = Focused::Forward,
+                            Focused::Playbar => if self.audio_created {
+                                self.current_device.as_mut().unwrap().lock().forward_2s()
+                            },
                             _ => (),
                         },
 
@@ -347,6 +353,8 @@ impl App {
                             state: KeyEventState::NONE,
                         }) => self.page = Page::About,
 
+                        FocusLost => self.focused = Focused::None,
+
                         _ => (),
                     }
 
@@ -391,7 +399,6 @@ impl Widget for &App {
                 }
                 block = block.title(Line::from(" GLAP | Player ").left_aligned());
 
-                let inner_area = block.inner(area);
                 let playback_area;
                 if self.focused == Focused::Explorer {
                     let layout = Layout::default()
@@ -401,8 +408,7 @@ impl Widget for &App {
                             Constraint::Length(1),
                             Constraint::Fill(1),
                         ])
-                        .split(inner_area);
-                    let left = layout[0];
+                        .split(block.inner(area));
 
                     playback_area = Layout::default()
                         .direction(Direction::Vertical)
@@ -410,7 +416,7 @@ impl Widget for &App {
                         .split(layout[2]);
 
                     let explorer = self.explorer_state.as_ref().unwrap().widget();
-                    explorer.render_ref(left, buf);
+                    explorer.render_ref(layout[0], buf);
                 } else {
                     playback_area = Layout::default()
                         .direction(Direction::Vertical)
@@ -431,6 +437,10 @@ impl Widget for &App {
                 });
                 let mut back = Paragraph::new("\u{F04AB}");
                 let mut forward = Paragraph::new("\u{F04AC}");
+                match self.repeat_sate {
+                    RepeatState::None => forward = forward.dim(),
+                    _ => (),
+                }
 
                 let playbar_area = Layout::default()
                     .direction(Direction::Vertical)

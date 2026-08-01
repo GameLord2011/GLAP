@@ -1,12 +1,12 @@
 extern crate sdl2;
 
+mod app;
+mod audio;
+
 use crate::app::main::App;
 use color_eyre::{Result, install};
 use ratatui::run;
 use sdl2::init;
-
-mod app;
-mod audio;
 
 #[cfg(not(target_os = "macos"))]
 #[used]
