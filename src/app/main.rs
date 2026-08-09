@@ -264,11 +264,10 @@ impl App {
                             Focused::Forward => self.focused = Focused::Play,
                             Focused::Repeat => self.focused = Focused::Forward,
                             Focused::None => self.focused = Focused::Back,
-                            Focused::Playbar => {
-                                if self.audio_created {
+                            Focused::Playbar
+                                if self.audio_created => {
                                     self.current_device.as_mut().unwrap().lock().back_2s()
                                 }
-                            }
                             _ => (),
                         },
 
@@ -282,11 +281,10 @@ impl App {
                             Focused::Play => self.focused = Focused::Forward,
                             Focused::Forward => self.focused = Focused::Repeat,
                             Focused::None => self.focused = Focused::Forward,
-                            Focused::Playbar => {
-                                if self.audio_created {
+                            Focused::Playbar
+                                if self.audio_created => {
                                     self.current_device.as_mut().unwrap().lock().forward_2s()
                                 }
-                            }
                             _ => (),
                         },
 
@@ -349,8 +347,8 @@ impl App {
                                         .collect();
                                     self.queue.remove(0); // On most systems this is the ../ directory.
                                     let idx = self.queue.iter().position(|n| n == &self.audio_path);
-                                    if idx.is_some() {
-                                        self.queue.rotate_left(idx.unwrap() + 1);
+                                    if let Some(i) = idx {
+                                        self.queue.rotate_left(i - 1);
                                     }
                                     self.que_idx = 0;
                                     // self.should_make_new_device = true;
@@ -453,10 +451,7 @@ impl Widget for &App {
                     RepeatState::RepeatAll => "\u{F0456}",
                     RepeatState::RepeatOne => "\u{F0458}",
                 });
-                match self.repeat_sate {
-                    RepeatState::None => forward = forward.dim(),
-                    _ => (),
-                }
+                if self.repeat_sate == RepeatState::None { forward = forward.dim() }
 
                 let playbar_area = Layout::default()
                     .direction(Direction::Vertical)
@@ -507,8 +502,8 @@ impl Widget for &App {
                     _ => (),
                 }
 
-                if self.audio_created && self.playback_ratio.is_some() {
-                    progress_bar = progress_bar.ratio(self.playback_ratio.unwrap());
+                if self.audio_created && let Some(r) = self.playback_ratio {
+                    progress_bar = progress_bar.ratio(r);
                 } else {
                     progress_bar = progress_bar.ratio(0_f64);
                 }
