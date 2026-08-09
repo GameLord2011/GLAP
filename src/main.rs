@@ -20,7 +20,6 @@ static MESSAGE: [u8; include_bytes!("message.txt").len()] = *include_bytes!("mes
 
 fn main() -> Result<()> {
     install()?;
-    let audio_subsystem = init().unwrap().audio().unwrap();
-    run(|terminal| App::default().run(terminal, audio_subsystem))?;
+    run(|terminal| App::default().run(terminal, init().unwrap().audio().unwrap()))?;
     Ok(())
 }

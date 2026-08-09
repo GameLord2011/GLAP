@@ -76,7 +76,6 @@ impl AudioCallback for AudioPlayer {
     type Channel = f32;
 
     fn callback(&mut self, out: &mut [f32]) {
-        let samples_len = self.samples.len();
         if self.finished {
             // Basically a fallback thing for a likely non-existent edge-case.
             for x in out.iter_mut() {
@@ -84,6 +83,7 @@ impl AudioCallback for AudioPlayer {
             }
         } else {
             let l = out.len();
+            let samples_len = self.samples.len();
 
             if (self.whar_am_i + l) > samples_len {
                 // What it can copy.

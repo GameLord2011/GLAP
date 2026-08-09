@@ -5,7 +5,10 @@ use std::{
     time::Duration,
 };
 
-use crossterm::event::{Event::{FocusLost, Key}, KeyCode, KeyEvent, KeyEventKind, KeyEventState, KeyModifiers};
+use crossterm::event::{
+    Event::{FocusLost, Key},
+    KeyCode, KeyEvent, KeyEventKind, KeyEventState, KeyModifiers,
+};
 use ratatui::{
     DefaultTerminal, Frame,
     buffer::Buffer,
@@ -52,18 +55,23 @@ enum Page {
 
 #[derive(Default)]
 pub struct App {
+    // App state
     page: Page,
+    exit: bool,
+    explorer_state: Option<FileExplorer>,
+    focused: Focused,
+    playing: bool,
+
+    // Audio state.
     comment_string: String,
-    helper_thread_handle: Option<JoinHandle<Result<AudioPlayer, Error>>>,
+    helper_thread_handle: Option<JoinHandle<Result<AudioPlayer, Error>>>, // Peak type.
     audio_path: PathBuf,
     should_make_new_device: bool,
     current_device: Option<AudioDevice<AudioPlayer>>,
     audio_created: bool,
-    exit: bool,
-    explorer_state: Option<FileExplorer>,
+
+    // playback state
     playback_ratio: Option<f64>,
-    focused: Focused,
-    playing: bool,
     repeat_sate: RepeatState,
     queue: Vec<PathBuf>,
     que_idx: usize,
@@ -84,8 +92,8 @@ impl App {
                     .border_type(BorderType::Double),
             ),
         );
-        let audio_dir = dirs::audio_dir();
-        if let Some(d) = audio_dir {
+
+        if let Some(d) = dirs::audio_dir() {
             self.explorer_state.as_mut().unwrap().set_cwd(d)?;
         }
 
@@ -104,7 +112,7 @@ impl App {
     }
 
     fn handle_events(&mut self, audio_subsystem: &AudioSubsystem) -> io::Result<()> {
-        // Device creation. I put it here because it can take some time :P
+        // Device creation. I put it here because it can take some time and requires querying :P
         if self.should_make_new_device {
             if self.helper_thread_handle.is_none() {
                 #[cfg(debug_assertions)]
@@ -130,7 +138,7 @@ impl App {
                             .unwrap()
                             .to_owned();
                         self.current_device =
-                            Some(create_device(d.unwrap(), audio_subsystem.clone()).1);
+                            Some(create_device(d.unwrap(), audio_subsystem.clone()));
                         self.current_device.as_mut().unwrap().resume();
                         self.audio_created = true;
                         self.playing = true;
@@ -143,6 +151,7 @@ impl App {
         // Audio handling stuff.
         if self.audio_created {
             self.playback_ratio = Some(self.current_device.as_mut().unwrap().lock().get_progress());
+
             if self.current_device.as_mut().unwrap().lock().finished {
                 match self.repeat_sate {
                     RepeatState::None => self.current_device.as_mut().unwrap().pause(),
@@ -255,9 +264,11 @@ impl App {
                             Focused::Forward => self.focused = Focused::Play,
                             Focused::Repeat => self.focused = Focused::Forward,
                             Focused::None => self.focused = Focused::Back,
-                            Focused::Playbar => if self.audio_created {
-                                self.current_device.as_mut().unwrap().lock().back_2s()
-                            },
+                            Focused::Playbar => {
+                                if self.audio_created {
+                                    self.current_device.as_mut().unwrap().lock().back_2s()
+                                }
+                            }
                             _ => (),
                         },
 
@@ -271,9 +282,11 @@ impl App {
                             Focused::Play => self.focused = Focused::Forward,
                             Focused::Forward => self.focused = Focused::Repeat,
                             Focused::None => self.focused = Focused::Forward,
-                            Focused::Playbar => if self.audio_created {
-                                self.current_device.as_mut().unwrap().lock().forward_2s()
-                            },
+                            Focused::Playbar => {
+                                if self.audio_created {
+                                    self.current_device.as_mut().unwrap().lock().forward_2s()
+                                }
+                            }
                             _ => (),
                         },
 
@@ -308,7 +321,10 @@ impl App {
                                 }
                             }
 
-                            Focused::Back => self.current_device.as_mut().unwrap().lock().restart(),
+                            Focused::Back => {
+                                self.current_device.as_mut().unwrap().lock().restart();
+                                self.playing = true;
+                            }
 
                             Focused::Forward => match self.repeat_sate {
                                 RepeatState::None => (),
@@ -381,20 +397,20 @@ impl Widget for &App {
                 if self.focused == Focused::Explorer {
                     block = block.title_bottom(Line::from(vec![
                         " Quit ".into(),
-                        "<CTRL + Q>".green().bold(),
+                        "^q".green().bold(),
                         "; About ".into(),
-                        "<CTRL + A>".green().bold(),
+                        "^a".green().bold(),
                         "; Close Explorer ".into(),
-                        "<TAB> ".green().bold(),
+                        "TAB ".green().bold(),
                     ]));
                 } else {
                     block = block.title_bottom(Line::from(vec![
                         " Quit ".into(),
-                        "<CTRL + Q>".green().bold(),
+                        "^q".green().bold(),
                         "; About ".into(),
-                        "<CTRL + A>".green().bold(),
+                        "^a".green().bold(),
                         "; Open Explorer ".into(),
-                        "<TAB> ".green().bold(),
+                        "TAB ".green().bold(),
                     ]));
                 }
                 block = block.title(Line::from(" GLAP | Player ").left_aligned());
@@ -426,17 +442,17 @@ impl Widget for &App {
 
                 block.render(area, buf);
 
+                let mut back = Paragraph::new("\u{F04AB}");
                 let mut play_button = Paragraph::new(match self.playing {
                     true => "\u{F03E4}",
                     false => "\u{F040A}",
                 });
+                let mut forward = Paragraph::new("\u{F04AC}");
                 let mut repeat = Paragraph::new(match self.repeat_sate {
                     RepeatState::None => "\u{F0457}",
                     RepeatState::RepeatAll => "\u{F0456}",
                     RepeatState::RepeatOne => "\u{F0458}",
                 });
-                let mut back = Paragraph::new("\u{F04AB}");
-                let mut forward = Paragraph::new("\u{F04AC}");
                 match self.repeat_sate {
                     RepeatState::None => forward = forward.dim(),
                     _ => (),
@@ -510,9 +526,9 @@ impl Widget for &App {
                 block = block
                     .title_bottom(Line::from(vec![
                         " Quit ".into(),
-                        "<CTRL + Q>".green().bold(),
+                        "^q".green().bold(),
                         "; Player ".into(),
-                        "<CTRL + P> ".green().bold(),
+                        "^p ".green().bold(),
                     ]))
                     .title(Line::from(" GLAP | About ").left_aligned());
                 Paragraph::new(include_str!("about.txt"))
