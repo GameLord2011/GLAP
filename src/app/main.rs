@@ -21,9 +21,12 @@ use ratatui::{
 use ratatui_explorer::{FileExplorer, Theme};
 use sdl2::{AudioSubsystem, audio::AudioDevice};
 
-use crate::audio::{
-    audio_player::AudioPlayer,
-    processing::{create_device, process_samples_from_file},
+use crate::{
+    audio::{
+        audio_player::AudioPlayer,
+        processing::{create_device, process_samples_from_file},
+    },
+    Config,
 };
 
 #[derive(Default, PartialEq)]
@@ -53,6 +56,16 @@ enum Page {
     Player,
 }
 
+/*
+    "Erm acktually ChatGPT / Copilot / Claude / Deepseek / Librewhateverthef**kAIpeopleuse
+    says that this is not idiomatic Rust and that the app state should be split into three
+    different structs."
+
+    NO. I will not do this. I am already in the 9'th circle of ownership hell so I don't
+    want to add another thing to this. This is not a user-facing library so having a
+    monolithic App struct is FINE. THIS IS MY FINAL SAY ON THIS DO NOT OPEN ANY PRS
+    BUGGING ME ABOUT THIS.
+*/
 #[derive(Default)]
 pub struct App {
     // App state
@@ -75,6 +88,9 @@ pub struct App {
     repeat_sate: RepeatState,
     queue: Vec<PathBuf>,
     que_idx: usize,
+
+    // Theme
+    theme: Option<crate::Theme>
 }
 
 impl App {
@@ -82,6 +98,7 @@ impl App {
         &mut self,
         terminal: &mut DefaultTerminal,
         audio_subsystem: AudioSubsystem,
+        config: Option<crate::Config>,
     ) -> io::Result<()> {
         // Explorer creation.
         self.explorer_state = Some(FileExplorer::new().unwrap());
@@ -508,8 +525,7 @@ impl Widget for &App {
                     progress_bar = progress_bar.ratio(0_f64);
                 }
 
-                let title = Paragraph::new(self.comment_string.clone());
-                title.render(playback_area[0], buf);
+                Paragraph::new(self.comment_string.clone()).render(playback_area[0], buf);
                 progress_bar.render(playbar_area[0], buf);
                 back.render(controls_area[1], buf);
                 play_button.render(controls_area[3], buf);
