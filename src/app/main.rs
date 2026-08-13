@@ -10,23 +10,16 @@ use crossterm::event::{
     KeyCode, KeyEvent, KeyEventKind, KeyEventState, KeyModifiers,
 };
 use ratatui::{
-    DefaultTerminal, Frame,
-    buffer::Buffer,
-    layout::{Constraint, Direction, Layout, Rect},
-    style::{Style, Styled, Stylize},
-    symbols,
-    text::Line,
-    widgets::{Block, BorderType, Borders, LineGauge, Paragraph, Widget, WidgetRef, Wrap},
+    DefaultTerminal, Frame, buffer::Buffer, layout::{Constraint, Direction, Layout, Rect}, style::{Color, Style, Styled, Stylize}, symbols, text::Line, widgets::{Block, BorderType, Borders, LineGauge, Paragraph, Widget, WidgetRef, Wrap},
 };
 use ratatui_explorer::{FileExplorer, Theme};
 use sdl2::{AudioSubsystem, audio::AudioDevice};
 
 use crate::{
-    audio::{
+    Config, audio::{
         audio_player::AudioPlayer,
         processing::{create_device, process_samples_from_file},
-    },
-    Config,
+    }, utils::utils::string_to_color,
 };
 
 #[derive(Default, PartialEq)]
@@ -89,8 +82,10 @@ pub struct App {
     queue: Vec<PathBuf>,
     que_idx: usize,
 
-    // Theme
-    theme: Option<crate::Theme>
+    fg: Color,
+    bg: Color,
+    playbar: Color,
+    controls: Color,
 }
 
 impl App {
@@ -98,7 +93,7 @@ impl App {
         &mut self,
         terminal: &mut DefaultTerminal,
         audio_subsystem: AudioSubsystem,
-        config: Option<crate::Config>,
+        config: Config
     ) -> io::Result<()> {
         // Explorer creation.
         self.explorer_state = Some(FileExplorer::new().unwrap());
@@ -110,8 +105,32 @@ impl App {
             ),
         );
 
-        if let Some(d) = dirs::audio_dir() {
+        if let Some(d) = config.music_folder {
             self.explorer_state.as_mut().unwrap().set_cwd(d)?;
+        } else if let Some(d) = dirs::audio_dir() {
+            self.explorer_state.as_mut().unwrap().set_cwd(d)?;
+        }
+
+        if let Some(theme) = config.theme {
+            if let Some(fg) = theme.foreground {
+                self.fg = string_to_color(fg);
+            }
+            if let Some(bg) = theme.background {
+                self.bg = string_to_color(bg);
+            }
+            if let Some(pb) = theme.playbar {
+                self.playbar = string_to_color(pb);
+            } else {
+                self.playbar = Color::Red;
+            }
+            if let Some(controls) = theme.controls {
+                self.controls = string_to_color(controls);
+            } else {
+                self.controls = Color::Green
+            }
+        } else {
+            self.playbar = Color::Red;
+            self.controls = Color::Green;
         }
 
         loop {
@@ -402,30 +421,30 @@ impl App {
 
 impl Widget for &App {
     fn render(self, area: Rect, buf: &mut Buffer) {
-        let mut block = Block::bordered().border_type(BorderType::Double);
+        let mut block = Block::bordered().border_type(BorderType::Double).style(Style::default().fg(self.fg).bg(self.bg));
         let highlighted = Style::default()
-            .fg(ratatui::style::Color::Black)
-            .bg(ratatui::style::Color::White);
+            .fg(self.bg)
+            .bg(self.fg);
 
         match self.page {
             Page::Player => {
                 if self.focused == Focused::Explorer {
                     block = block.title_bottom(Line::from(vec![
                         " Quit ".into(),
-                        "^q".green().bold(),
+                        "^q".fg(self.controls).bold(),
                         "; About ".into(),
-                        "^a".green().bold(),
+                        "^a".fg(self.controls).bold(),
                         "; Close Explorer ".into(),
-                        "TAB ".green().bold(),
+                        "TAB ".fg(self.controls).bold(),
                     ]));
                 } else {
                     block = block.title_bottom(Line::from(vec![
                         " Quit ".into(),
-                        "^q".green().bold(),
+                        "^q".fg(self.controls).bold(),
                         "; About ".into(),
-                        "^a".green().bold(),
+                        "^a".fg(self.controls).bold(),
                         "; Open Explorer ".into(),
-                        "TAB ".green().bold(),
+                        "TAB ".fg(self.controls).bold(),
                     ]));
                 }
                 block = block.title(Line::from(" GLAP | Player ").left_aligned());
@@ -495,7 +514,7 @@ impl Widget for &App {
                     .split(playbar_area[2]);
 
                 let mut progress_bar = LineGauge::default()
-                    .filled_style(Style::new().red().bold())
+                    .filled_style(Style::new().fg(self.playbar))
                     .label("Played")
                     .filled_symbol(symbols::line::THICK_HORIZONTAL)
                     .unfilled_symbol(symbols::line::THICK_HORIZONTAL);
@@ -537,9 +556,9 @@ impl Widget for &App {
                 block = block
                     .title_bottom(Line::from(vec![
                         " Quit ".into(),
-                        "^q".green().bold(),
+                        "^q".fg(self.controls).bold(),
                         "; Player ".into(),
-                        "^p ".green().bold(),
+                        "^p ".fg(self.controls).bold(),
                     ]))
                     .title(Line::from(" GLAP | About ").left_aligned());
                 Paragraph::new(include_str!("about.txt"))
