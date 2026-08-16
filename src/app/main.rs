@@ -435,7 +435,7 @@ impl Widget for &App {
                         "; About ".into(),
                         "^a".fg(self.controls).bold(),
                         "; Close Explorer ".into(),
-                        "TAB ".fg(self.controls).bold(),
+                        "[TAB] ".fg(self.controls).bold(),
                     ]));
                 } else {
                     block = block.title_bottom(Line::from(vec![
@@ -444,7 +444,7 @@ impl Widget for &App {
                         "; About ".into(),
                         "^a".fg(self.controls).bold(),
                         "; Open Explorer ".into(),
-                        "TAB ".fg(self.controls).bold(),
+                        "[TAB] ".fg(self.controls).bold(),
                     ]));
                 }
                 block = block.title(Line::from(" GLAP | Player ").left_aligned());

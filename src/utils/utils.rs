@@ -1,7 +1,7 @@
 use ratatui::style::Color;
 
 /**
- * A function for converting a [String] into a [ratatui::style::Color]. Defaults to `Color::Black`
+ * A function for converting a [String] into a [ratatui::style::Color]. Defaults to `Color::Reset`
  */
 pub fn string_to_color(string: String) -> Color {
     match string.to_lowercase().as_str() {

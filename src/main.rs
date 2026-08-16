@@ -1,8 +1,3 @@
-/*
-    TODO:
-        Fix color-to-tui or replace it.
-*/
-
 extern crate sdl2;
 
 mod app;
