@@ -10,16 +10,24 @@ use crossterm::event::{
     KeyCode, KeyEvent, KeyEventKind, KeyEventState, KeyModifiers,
 };
 use ratatui::{
-    DefaultTerminal, Frame, buffer::Buffer, layout::{Constraint, Direction, Layout, Rect}, style::{Color, Style, Styled, Stylize}, symbols, text::Line, widgets::{Block, BorderType, Borders, LineGauge, Paragraph, Widget, WidgetRef, Wrap},
+    DefaultTerminal, Frame,
+    buffer::Buffer,
+    layout::{Constraint, Direction, Layout, Rect},
+    style::{Color, Style, Styled, Stylize},
+    symbols,
+    text::Line,
+    widgets::{Block, BorderType, Borders, LineGauge, Paragraph, Widget, WidgetRef, Wrap},
 };
 use ratatui_explorer::{FileExplorer, Theme};
 use sdl2::{AudioSubsystem, audio::AudioDevice};
 
 use crate::{
-    Config, audio::{
+    Config,
+    audio::{
         audio_player::AudioPlayer,
         processing::{create_device, process_samples_from_file},
-    }, utils::utils::string_to_color,
+    },
+    utils::utils::string_to_color,
 };
 
 #[derive(Default, PartialEq)]
@@ -93,7 +101,7 @@ impl App {
         &mut self,
         terminal: &mut DefaultTerminal,
         audio_subsystem: AudioSubsystem,
-        config: Config
+        config: Config,
     ) -> io::Result<()> {
         // Explorer creation.
         self.explorer_state = Some(FileExplorer::new().unwrap());
@@ -300,10 +308,9 @@ impl App {
                             Focused::Forward => self.focused = Focused::Play,
                             Focused::Repeat => self.focused = Focused::Forward,
                             Focused::None => self.focused = Focused::Back,
-                            Focused::Playbar
-                                if self.audio_created => {
-                                    self.current_device.as_mut().unwrap().lock().back_2s()
-                                }
+                            Focused::Playbar if self.audio_created => {
+                                self.current_device.as_mut().unwrap().lock().back_2s()
+                            }
                             _ => (),
                         },
 
@@ -317,10 +324,9 @@ impl App {
                             Focused::Play => self.focused = Focused::Forward,
                             Focused::Forward => self.focused = Focused::Repeat,
                             Focused::None => self.focused = Focused::Forward,
-                            Focused::Playbar
-                                if self.audio_created => {
-                                    self.current_device.as_mut().unwrap().lock().forward_2s()
-                                }
+                            Focused::Playbar if self.audio_created => {
+                                self.current_device.as_mut().unwrap().lock().forward_2s()
+                            }
                             _ => (),
                         },
 
@@ -421,10 +427,10 @@ impl App {
 
 impl Widget for &App {
     fn render(self, area: Rect, buf: &mut Buffer) {
-        let mut block = Block::bordered().border_type(BorderType::Double).style(Style::default().fg(self.fg).bg(self.bg));
-        let highlighted = Style::default()
-            .fg(self.bg)
-            .bg(self.fg);
+        let mut block = Block::bordered()
+            .border_type(BorderType::Double)
+            .style(Style::default().fg(self.fg).bg(self.bg));
+        let highlighted = Style::default().fg(self.bg).bg(self.fg);
 
         match self.page {
             Page::Player => {
@@ -487,7 +493,9 @@ impl Widget for &App {
                     RepeatState::RepeatAll => "\u{F0456}",
                     RepeatState::RepeatOne => "\u{F0458}",
                 });
-                if self.repeat_sate == RepeatState::None { forward = forward.dim() }
+                if self.repeat_sate == RepeatState::None {
+                    forward = forward.dim()
+                }
 
                 let playbar_area = Layout::default()
                     .direction(Direction::Vertical)
@@ -538,7 +546,9 @@ impl Widget for &App {
                     _ => (),
                 }
 
-                if self.audio_created && let Some(r) = self.playback_ratio {
+                if self.audio_created
+                    && let Some(r) = self.playback_ratio
+                {
                     progress_bar = progress_bar.ratio(r);
                 } else {
                     progress_bar = progress_bar.ratio(0_f64);

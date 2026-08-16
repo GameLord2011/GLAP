@@ -38,7 +38,7 @@ pub fn string_to_color(string: String) -> Color {
                     } else {
                         Color::Reset
                     }
-                },
+                }
                 4 | 7 => {
                     let mut d = string.clone();
                     if d.remove(0) != '#' {
@@ -53,25 +53,26 @@ pub fn string_to_color(string: String) -> Color {
                                 r = u8::from_str_radix(&d[0..2], 16);
                                 g = u8::from_str_radix(&d[2..4], 16);
                                 b = u8::from_str_radix(&d[4..6], 16);
-                            },
+                            }
                             3 => {
                                 r = u8::from_str_radix(&d[0..1], 16).map(|r| r * 17);
                                 g = u8::from_str_radix(&d[1..2], 16).map(|g| g * 17);
                                 b = u8::from_str_radix(&d[2..3], 16).map(|b| b * 17);
-                            },
-                            _ => { // I don't know how this would happen but I guess put it there.
+                            }
+                            _ => {
+                                // I don't know how this would happen but I guess put it there.
                                 r = Ok(0);
                                 g = Ok(0);
                                 b = Ok(0);
-                            },
+                            }
                         }
                         match (r, g, b) {
                             (Ok(r), Ok(g), Ok(b)) => Color::Rgb(r, g, b),
-                            _ => Color::Reset
+                            _ => Color::Reset,
                         }
                     }
                 }
-                _ => Color::Reset
+                _ => Color::Reset,
             }
         }
     }
