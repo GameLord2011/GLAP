@@ -30,6 +30,8 @@ use crate::{
     utils::utils::string_to_color,
 };
 
+const SUPPORTED_EXTENSIONS: [&str; 6] = ["mp2", "mp3", "flac", "ogg", "aac", "wav"];
+
 #[derive(Default, PartialEq)]
 enum RepeatState {
     #[default]
@@ -112,6 +114,28 @@ impl App {
                     .border_type(BorderType::Double),
             ),
         );
+
+        if !config.dont_filter_unplayable.unwrap_or_default() {
+            self.explorer_state.as_mut().unwrap().set_filter_map(|f| {
+                if match f.path.extension() {
+                    Some(e) => {
+                        let extension = e.to_str().unwrap_or_default();
+                        if SUPPORTED_EXTENSIONS.contains(&extension) {
+                            true
+                        } else {
+                            false
+                        }
+                    }
+                    None => {
+                        f.is_dir
+                    }
+                } {
+                    return Some(f);
+                } else {
+                    return None;
+                }
+            })?;
+        }
 
         if let Some(d) = config.music_folder {
             self.explorer_state.as_mut().unwrap().set_cwd(d)?;
@@ -430,7 +454,11 @@ impl Widget for &App {
         let mut block = Block::bordered()
             .border_type(BorderType::Double)
             .style(Style::default().fg(self.fg).bg(self.bg));
-        let highlighted = Style::default().fg(self.bg).bg(self.fg);
+        let highlighted;
+        match (self.bg == Color::Reset, self.fg == Color::Reset) {
+            (false, false) => {highlighted = Style::new().fg(self.bg).bg(self.fg)},
+            _ => {highlighted = Style::new().fg(Color::Black).bg(Color::White)}
+        }
 
         match self.page {
             Page::Player => {

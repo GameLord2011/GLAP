@@ -22,7 +22,7 @@ static MESSAGE: [u8; include_bytes!("message.txt").len()] = *include_bytes!("mes
 #[unsafe(link_section = "__TEXT,__text")]
 static MESSAGE: [u8; include_bytes!("message.txt").len()] = *include_bytes!("message.txt");
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Default)]
 pub struct Theme {
     foreground: Option<String>,
     background: Option<String>,
@@ -33,6 +33,7 @@ pub struct Theme {
 #[derive(Serialize, Deserialize, Default)]
 pub struct Config {
     music_folder: Option<String>,
+    dont_filter_unplayable: Option<bool>,
     theme: Option<Theme>,
 }
 

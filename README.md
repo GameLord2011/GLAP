@@ -4,7 +4,27 @@ GameLord's Audio Player.
 
 Let's be honest. Audio player apps are not fun to use. One day I thought, why not just make my own at this point. This project was originally RMIDI, a dedicated MIDI player, but that didn't work out for reasons I won't get into (I hate MIDI status `0xB0` now). ~~It's written in rust so you know it's fast.~~
 
-Oh also main_old.rs contains the old code if you want to poke it.
+Oh also `src/main_old.rs` contains the old code if you want to poke it.
+
+## Requirements and notes
+
+You need a [nerd font](https://www.nerdfonts.com/#home) for the controls to render properly, some known side-effects of not having one are:
+
+- Highlighting doesn't work on Windows Terminal if there isn't one
+
+It is known to work on Windows Terminal. In conhost.exe highlighting doesn't work. In terminal.app hex code color schemes may not work at all. (see [this](https://github.com/ratatui/ratatui/issues/475) issue for more information).
+
+Additionally, there are some cases of extreme ram usage (>50% in some cases where I measured it) with an IGPU when using Windows Terminal due to how it allocates ram, __this isn't my fault, it is the fault of the terminal app__. Turning on WARP (the software renderer) usually mitigates this.
+
+## Configuration options
+
+- `music_folder` overrides the default music folder just in case you aren't using your OS'es default music folder (e.g. `C:\Users\USER\OneDrive\Music` for some reason or something idk)
+- `dont_filter_umplayable` when set to true filters out unplayable music, probably to test an extension that idk if it works or smth idk what you people do
+- `theme` a table consisting of:
+  - `foreground` a hex code, color name, or ANSI color index setting the foreground (text) color
+  - `background` the same thing but it sets the background color
+  - `controls` the same thing but it sets the controls color
+  - `playbar` the same thing but it sets the playbar played thing color
 
 ## What did I test it on
 
@@ -12,10 +32,11 @@ Oh also main_old.rs contains the old code if you want to poke it.
 
 Known to work on:
 
-- Mpeg-1 Audio Layer II
-- Mpeg-1 Audio Layer III
-- Free Lossless Audio Codec
-- Ogg Vorbis
+- Mpeg-1 Audio Layer II (`.mp2`)
+- Mpeg-1 Audio Layer III (`.mp3`)
+- Free Lossless Audio Codec (`.flac`)
+- Ogg Vorbis (`.ogg`)
+- AAC-LC (`.aac`)
 
 Should theoretically work on anything that [Symphonia](https://github.com/pdeljanov/Symphonia) supports, though some formats (namely Mpeg-1 Audio Layer I, raw PCM, and others) are hard for me to get my hands on so there is no guarentee that anything that I haven't tested works.
 
