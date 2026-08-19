@@ -10,16 +10,18 @@ Oh also `src/main_old.rs` contains the old code if you want to poke it.
 
 You need a [nerd font](https://www.nerdfonts.com/#home) for the controls to render properly, some known side-effects of not having one are:
 
-- Highlighting doesn't work on Windows Terminal if there isn't one
+- Highlighting doesn't work on Windows Terminal or Conhost if you aren't using a nerd font.
 
-It is known to work on Windows Terminal. In conhost.exe highlighting doesn't work. In terminal.app hex code color schemes may not work at all. (see [this](https://github.com/ratatui/ratatui/issues/475) issue for more information).
+It is known to work on Windows Terminal and Conhost. In terminal.app hex code color schemes may not work at all. (see [this](https://github.com/ratatui/ratatui/issues/475) issue for more information).
 
 Additionally, there are some cases of extreme ram usage (>50% in some cases where I measured it) with an IGPU when using Windows Terminal due to how it allocates ram, __this isn't my fault, it is the fault of the terminal app__. Turning on WARP (the software renderer) usually mitigates this.
+
+Additionally, __THIS IS NOT A MUSIC STREAMING APP__.
 
 ## Configuration options
 
 - `music_folder` overrides the default music folder just in case you aren't using your OS'es default music folder (e.g. `C:\Users\USER\OneDrive\Music` for some reason or something idk)
-- `dont_filter_umplayable` when set to true filters out unplayable music, probably to test an extension that idk if it works or smth idk what you people do
+- `dont_filter_unplayable` when set to true doens't filter out unplayable music, probably to test an extension that I don't know if it works.
 - `theme` a table consisting of:
   - `foreground` a hex code, color name, or ANSI color index setting the foreground (text) color
   - `background` the same thing but it sets the background color

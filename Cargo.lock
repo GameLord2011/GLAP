@@ -15,6 +15,7 @@ dependencies = [
  "serde",
  "symphonia",
  "toml",
+ "tui-checkbox",
 ]
 
 [[package]]
@@ -2015,6 +2016,15 @@ checksum = "1ad61aed86bc3faea4300c7aee358b4c6d0c8d6ccc36524c96e4c92ccf26e77e"
 dependencies = [
  "num-integer",
  "strength_reduce",
+]
+
+[[package]]
+name = "tui-checkbox"
+version = "0.4.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9c58a691322aaf315585a8c6e4d61aff48900071fc00a5c1e5f84f5494fc59be"
+dependencies = [
+ "ratatui",
 ]
 
 [[package]]

@@ -16,10 +16,11 @@ use ratatui::{
     style::{Color, Style, Styled, Stylize},
     symbols,
     text::Line,
-    widgets::{Block, BorderType, Borders, LineGauge, Paragraph, Widget, WidgetRef, Wrap},
+    widgets::{Block, BorderType, Borders, LineGauge, Paragraph, Widget, WidgetRef},
 };
 use ratatui_explorer::{FileExplorer, Theme};
 use sdl2::{AudioSubsystem, audio::AudioDevice};
+use tui_checkbox::Checkbox;
 
 use crate::{
     Config,
@@ -27,7 +28,7 @@ use crate::{
         audio_player::AudioPlayer,
         processing::{create_device, process_samples_from_file},
     },
-    utils::utils::string_to_color,
+    utils::string_to_color,
 };
 
 const SUPPORTED_EXTENSIONS: [&str; 6] = ["mp2", "mp3", "flac", "ogg", "aac", "wav"];
@@ -50,13 +51,14 @@ enum Focused {
     Forward,
     Repeat,
     Playbar,
+    Settings1,
 }
 
 #[derive(Default, PartialEq)]
 enum Page {
-    About,
     #[default]
     Player,
+    Settings,
 }
 
 /*
@@ -85,6 +87,7 @@ pub struct App {
     should_make_new_device: bool,
     current_device: Option<AudioDevice<AudioPlayer>>,
     audio_created: bool,
+    audio_subsystem: Option<AudioSubsystem>,
 
     // playback state
     playback_ratio: Option<f64>,
@@ -92,6 +95,7 @@ pub struct App {
     queue: Vec<PathBuf>,
     que_idx: usize,
 
+    // config
     fg: Color,
     bg: Color,
     playbar: Color,
@@ -106,6 +110,8 @@ impl App {
         config: Config,
     ) -> io::Result<()> {
         // Explorer creation.
+        self.audio_subsystem = Some(audio_subsystem);
+
         self.explorer_state = Some(FileExplorer::new().unwrap());
         self.explorer_state.as_mut().unwrap().set_theme(
             Theme::new().with_highlight_symbol("> ").with_block(
@@ -120,19 +126,13 @@ impl App {
                 if match f.path.extension() {
                     Some(e) => {
                         let extension = e.to_str().unwrap_or_default();
-                        if SUPPORTED_EXTENSIONS.contains(&extension) {
-                            true
-                        } else {
-                            false
-                        }
+                        SUPPORTED_EXTENSIONS.contains(&extension)
                     }
-                    None => {
-                        f.is_dir
-                    }
+                    None => f.is_dir,
                 } {
-                    return Some(f);
+                    Some(f)
                 } else {
-                    return None;
+                    None
                 }
             })?;
         }
@@ -167,7 +167,7 @@ impl App {
 
         loop {
             terminal.draw(|frame| self.draw(frame))?;
-            self.handle_events(&audio_subsystem)?;
+            self.handle_events()?;
             if self.exit {
                 break;
             }
@@ -179,7 +179,7 @@ impl App {
         frame.render_widget(self, frame.area());
     }
 
-    fn handle_events(&mut self, audio_subsystem: &AudioSubsystem) -> io::Result<()> {
+    fn handle_events(&mut self) -> io::Result<()> {
         // Device creation. I put it here because it can take some time and requires querying :P
         if self.should_make_new_device {
             if self.helper_thread_handle.is_none() {
@@ -205,8 +205,10 @@ impl App {
                             .to_str()
                             .unwrap()
                             .to_owned();
-                        self.current_device =
-                            Some(create_device(d.unwrap(), audio_subsystem.clone()));
+                        self.current_device = Some(create_device(
+                            d.unwrap(),
+                            self.audio_subsystem.as_ref().unwrap().clone(),
+                        ));
                         self.current_device.as_mut().unwrap().resume();
                         self.audio_created = true;
                         self.playing = true;
@@ -255,19 +257,6 @@ impl App {
             }
 
             match self.page {
-                Page::About => {
-                    if event
-                        == Key(KeyEvent {
-                            code: KeyCode::Char('p'),
-                            modifiers: KeyModifiers::CONTROL,
-                            kind: KeyEventKind::Press,
-                            state: KeyEventState::NONE,
-                        })
-                    {
-                        self.page = Page::Player
-                    }
-                }
-
                 Page::Player => {
                     match event {
                         Key(KeyEvent {
@@ -427,11 +416,14 @@ impl App {
                         },
 
                         Key(KeyEvent {
-                            code: KeyCode::Char('a'),
+                            code: KeyCode::Char('s'),
                             modifiers: KeyModifiers::CONTROL,
                             kind: KeyEventKind::Press,
                             state: KeyEventState::NONE,
-                        }) => self.page = Page::About,
+                        }) => {
+                            self.page = Page::Settings;
+                            self.focused = Focused::Settings1;
+                        }
 
                         FocusLost => self.focused = Focused::None,
 
@@ -442,6 +434,16 @@ impl App {
                         self.explorer_state.as_mut().unwrap().handle(&event)?;
                     }
                 }
+
+                Page::Settings => match event {
+                    Key(KeyEvent {
+                        code: KeyCode::Char('p'),
+                        modifiers: KeyModifiers::CONTROL,
+                        kind: KeyEventKind::Press,
+                        state: KeyEventState::NONE,
+                    }) => self.page = Page::Player,
+                    _ => (),
+                },
             }
         }
 
@@ -454,11 +456,10 @@ impl Widget for &App {
         let mut block = Block::bordered()
             .border_type(BorderType::Double)
             .style(Style::default().fg(self.fg).bg(self.bg));
-        let highlighted;
-        match (self.bg == Color::Reset, self.fg == Color::Reset) {
-            (false, false) => {highlighted = Style::new().fg(self.bg).bg(self.fg)},
-            _ => {highlighted = Style::new().fg(Color::Black).bg(Color::White)}
-        }
+        let highlighted = match (self.bg == Color::Reset, self.fg == Color::Reset) {
+            (false, false) => Style::new().fg(self.bg).bg(self.fg),
+            _ => Style::new().fg(Color::Black).bg(Color::White),
+        };
 
         match self.page {
             Page::Player => {
@@ -466,8 +467,8 @@ impl Widget for &App {
                     block = block.title_bottom(Line::from(vec![
                         " Quit ".into(),
                         "^q".fg(self.controls).bold(),
-                        "; About ".into(),
-                        "^a".fg(self.controls).bold(),
+                        "; Settings ".into(),
+                        "^s".fg(self.controls).bold(),
                         "; Close Explorer ".into(),
                         "[TAB] ".fg(self.controls).bold(),
                     ]));
@@ -475,8 +476,8 @@ impl Widget for &App {
                     block = block.title_bottom(Line::from(vec![
                         " Quit ".into(),
                         "^q".fg(self.controls).bold(),
-                        "; About ".into(),
-                        "^a".fg(self.controls).bold(),
+                        "; Settings ".into(),
+                        "^s".fg(self.controls).bold(),
                         "; Open Explorer ".into(),
                         "[TAB] ".fg(self.controls).bold(),
                     ]));
@@ -590,20 +591,25 @@ impl Widget for &App {
                 repeat.render(controls_area[7], buf);
             }
 
-            Page::About => {
-                block = block
-                    .title_bottom(Line::from(vec![
-                        " Quit ".into(),
-                        "^q".fg(self.controls).bold(),
-                        "; Player ".into(),
-                        "^p ".fg(self.controls).bold(),
-                    ]))
-                    .title(Line::from(" GLAP | About ").left_aligned());
-                Paragraph::new(include_str!("about.txt"))
-                    .left_aligned()
-                    .wrap(Wrap { trim: false })
-                    .block(block)
-                    .render(area, buf);
+            Page::Settings => {
+                block = block.title_bottom(Line::from(vec![
+                    " Quit ".into(),
+                    "^q".fg(self.controls).bold(),
+                    "; Player ".into(),
+                    "^p ".fg(self.controls).bold(),
+                ]));
+
+                let settings_layout = Layout::default()
+                    .constraints([
+                        Constraint::Length(1),
+                        Constraint::Length(3),
+                        Constraint::Fill(1),
+                    ])
+                    .split(block.inner(area));
+
+                block.render(area, buf);
+                /*let filter_unplayable = */
+                Checkbox::new(" Filter unplayable files?", true).render(settings_layout[1], buf);
             }
         }
     }
