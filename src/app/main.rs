@@ -196,9 +196,7 @@ impl App {
                 if self.helper_thread_handle.as_ref().unwrap().is_finished() {
                     let d = self.helper_thread_handle.take().unwrap().join().unwrap();
                     if let Err(e) = d {
-                        self.comment_string =
-                            format!("Error on file {}: {}", self.audio_path.to_str().unwrap(), e)
-                                .to_string()
+                        self.comment_string = format!("Error on file {}: {}", self.audio_path.to_str().unwrap(), e)
                     } else {
                         self.comment_string = self
                             .audio_path
@@ -446,37 +444,38 @@ impl App {
                     }) => {
                         self.page = Page::Player;
                         self.focused = Focused::Play;
-                    },
+                    }
                     Key(KeyEvent {
                         code: KeyCode::Enter,
                         modifiers: KeyModifiers::NONE,
                         kind: KeyEventKind::Press,
                         state: KeyEventState::NONE,
-                    }) => {
-                        match self.focused {
-                            Focused::Settings1 => {
-                                if self.dont_filter_unplayable {
-                                    self.dont_filter_unplayable = false;
-                                    self.explorer_state.as_mut().unwrap().set_filter_map(|x| Some(x))?;
-                                } else {
-                                    self.dont_filter_unplayable = true;
-                                    self.explorer_state.as_mut().unwrap().set_filter_map(|f| {
-                                        if match f.path.extension() {
-                                            Some(e) => {
-                                                let extension = e.to_str().unwrap_or_default();
-                                                SUPPORTED_EXTENSIONS.contains(&extension)
-                                            }
-                                            None => f.is_dir,
-                                        } {
-                                            Some(f)
-                                        } else {
-                                            None
+                    }) => match self.focused {
+                        Focused::Settings1 => {
+                            if self.dont_filter_unplayable {
+                                self.dont_filter_unplayable = false;
+                                self.explorer_state
+                                    .as_mut()
+                                    .unwrap()
+                                    .set_filter_map(|x| Some(x))?;
+                            } else {
+                                self.dont_filter_unplayable = true;
+                                self.explorer_state.as_mut().unwrap().set_filter_map(|f| {
+                                    if match f.path.extension() {
+                                        Some(e) => {
+                                            let extension = e.to_str().unwrap_or_default();
+                                            SUPPORTED_EXTENSIONS.contains(&extension)
                                         }
-                                    })?;
-                                }
-                            },
-                            _ => ()
+                                        None => f.is_dir,
+                                    } {
+                                        Some(f)
+                                    } else {
+                                        None
+                                    }
+                                })?;
+                            }
                         }
+                        _ => (),
                     },
                     _ => (),
                 },
@@ -644,12 +643,15 @@ impl Widget for &App {
                     .split(block.inner(area));
 
                 block.render(area, buf);
-                let mut filter_unplayable = Checkbox::new("Filter unplayable files?", self.dont_filter_unplayable)
-                    .checked_symbol("[X]")
-                    .unchecked_symbol("[ ]");
+                let mut filter_unplayable =
+                    Checkbox::new("Filter unplayable files?", self.dont_filter_unplayable)
+                        .checked_symbol("[X]")
+                        .unchecked_symbol("[ ]");
 
                 match self.focused {
-                    Focused::Settings1 => filter_unplayable = filter_unplayable.set_style(highlighted),
+                    Focused::Settings1 => {
+                        filter_unplayable = filter_unplayable.set_style(highlighted)
+                    }
                     _ => (),
                 }
 

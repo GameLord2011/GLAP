@@ -1,7 +1,7 @@
-use sdl2::audio::AudioCallback;
-use std::fmt::{Debug, Result};
 #[allow(deprecated)]
 use core::intrinsics::copy_nonoverlapping;
+use sdl2::audio::AudioCallback;
+use std::fmt::{Debug, Result};
 
 /**
     An Audio Player for use with SDL2.
@@ -91,13 +91,17 @@ impl AudioCallback for AudioPlayer {
 
             if i > samples_len {
                 // What it can copy.
-                let can_copy = samples_len - self.whar_am_i;
+                let can_copy: usize = samples_len - self.whar_am_i;
 
                 // Copies the rest of the existing buffer. This is basically what
                 // copy_from_slice does under the hood, but with all the saftey
                 // checks removed.
                 unsafe {
-                    copy_nonoverlapping(self.samples[self.whar_am_i..].as_ptr(), out.as_mut_ptr(), can_copy);
+                    copy_nonoverlapping(
+                        self.samples[self.whar_am_i..].as_ptr(),
+                        out.as_mut_ptr(),
+                        can_copy,
+                    );
                 }
 
                 // As it turns out more efficent than specialize::SpecFill::spec_fill
@@ -110,7 +114,11 @@ impl AudioCallback for AudioPlayer {
             } else {
                 // Normal Operation.
                 unsafe {
-                    copy_nonoverlapping(self.samples[self.whar_am_i..i].as_ptr(), out.as_mut_ptr(), l);
+                    copy_nonoverlapping(
+                        self.samples[self.whar_am_i..i].as_ptr(),
+                        out.as_mut_ptr(),
+                        l,
+                    );
                 }
                 self.whar_am_i = i;
             }
